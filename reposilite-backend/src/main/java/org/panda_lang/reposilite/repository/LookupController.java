@@ -143,7 +143,7 @@ public final class LookupController implements Handler {
     }
 
     private void handleError(Context ctx, ErrorDto error) {
-        ctx.result(frontend.forMessage(error.getMessage()))
+        ctx.result(frontend.forMessage(error.getStatus(), error.getMessage()))
                 .status(error.getStatus())
                 .contentType("text/html")
                 .res.setCharacterEncoding("UTF-8");

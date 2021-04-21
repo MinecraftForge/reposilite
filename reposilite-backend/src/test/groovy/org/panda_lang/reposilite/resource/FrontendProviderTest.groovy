@@ -23,15 +23,17 @@ import org.panda_lang.reposilite.config.Configuration
 import static org.junit.jupiter.api.Assertions.assertFalse
 import static org.junit.jupiter.api.Assertions.assertTrue
 
+import org.apache.http.HttpStatus
+
 @CompileStatic
 class FrontendProviderTest {
 
-    private static final FrontendProvider FRONTEND_SERVICE = FrontendProvider.load(new Configuration())
+    private static final FrontendProvider FRONTEND_SERVICE = FrontendProvider.load(new Configuration(), null)
 
     @Test
     void forMessage () {
-        assertTrue FRONTEND_SERVICE.forMessage("test message").contains("test message")
-        assertFalse FRONTEND_SERVICE.forMessage("test message").contains("other message")
+        assertTrue FRONTEND_SERVICE.forMessage(HttpStatus.SC_NOT_FOUND, "test message").contains("test message")
+        assertFalse FRONTEND_SERVICE.forMessage(HttpStatus.SC_OK, "test message").contains("other message")
     }
 
     @Test

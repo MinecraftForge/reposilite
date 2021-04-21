@@ -26,7 +26,9 @@ import org.panda_lang.utilities.commons.function.PandaStream;
 
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -157,7 +159,17 @@ public final class FilesUtils {
         return occurrence == -1 ? StringUtils.EMPTY : name.substring(occurrence + 1);
     }
 
-    public static String getResource(String name) {
+    public static String getResource(String name, File base) {
+        File target = base == null ? null : new File(base, name);
+        if (target != null && target.exists()) {
+            try (InputStream stream = new FileInputStream(target)){
+                return IOUtils.convertStreamToString(stream).orElseThrow(ioException -> {
+                    throw new RuntimeException("Cannot load resource " + name, ioException);
+                });
+            } catch (IOException e) {
+                throw new RuntimeException("Cannot load resource " + name, e);
+            }
+        }
         return IOUtils.convertStreamToString(Reposilite.class.getResourceAsStream(name)).orElseThrow(ioException -> {
             throw new RuntimeException("Cannot load resource " + name, ioException);
         });
