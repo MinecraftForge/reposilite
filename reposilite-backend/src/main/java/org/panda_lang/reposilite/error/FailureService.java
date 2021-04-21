@@ -30,12 +30,19 @@ public final class FailureService {
     private final Set<String> exceptions = ConcurrentHashMap.newKeySet();
 
     public void throwException(String id, Throwable throwable) {
-        Reposilite.getLogger().error(id, throwable);
+        Reposilite.getLogger().debug(id, throwable);
 
-        exceptions.add(String.join(System.lineSeparator(),
+        boolean added = exceptions.add(String.join(System.lineSeparator(),
                 "failure " + id,
                 throwException(throwable)
         ).trim());
+
+        if (added) {
+            Reposilite.getLogger().info(id + ": " + throwable);
+            while (exceptions.size() > 50) {
+                exceptions.remove(exceptions.iterator().next());
+            }
+        }
     }
 
     private String throwException(@Nullable Throwable throwable) {
