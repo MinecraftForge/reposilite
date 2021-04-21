@@ -61,33 +61,41 @@ public final class ReposiliteHttpServer {
                 reposilite.getProxyService(),
                 reposilite.getFailureService());
 
-        LookupApiEndpoint lookupApiEndpoint = new LookupApiEndpoint(
-                configuration.rewritePathsEnabled,
-                reposilite.getContextFactory(),
-                reposilite.getRepositoryAuthenticator(),
-                reposilite.getRepositoryService());
-
-        CliController cliController = new CliController(
-                reposilite.getContextFactory(),
-                reposilite.getExecutor(),
-                reposilite.getAuthenticator(),
-                reposilite.getConsole());
-
         this.javalin = create(configuration)
                 .before(ctx -> reposilite.getStatsService().record(ctx.req.getRequestURI()))
                 .get("/webjars/*", new WebJarsHandler())
-                .get("/js/app.js", new FrontendHandler(reposilite))
+                .get("/js/app.js", new FrontendHandler(reposilite));
+
+        if (configuration.apiEnabled) {
+            LookupApiEndpoint lookupApiEndpoint = new LookupApiEndpoint(
+                    configuration.rewritePathsEnabled,
+                    configuration.apiRequiresAuth,
+                    reposilite.getContextFactory(),
+                    reposilite.getRepositoryAuthenticator(),
+                    reposilite.getRepositoryService());
+
+
+            CliController cliController = new CliController(
+                    reposilite.getContextFactory(),
+                    reposilite.getExecutor(),
+                    reposilite.getAuthenticator(),
+                    reposilite.getConsole());
+
+            this.javalin
                 .get("/api/auth", new AuthEndpoint(reposilite.getAuthService()))
                 .post("/api/execute", new RemoteExecutionEndpoint(reposilite.getAuthenticator(), reposilite.getContextFactory(), reposilite.getConsole()))
                 .ws("/api/cli", cliController)
                 .get("/api", lookupApiEndpoint)
-                .get("/api/*", lookupApiEndpoint)
-                .get("/*", lookupController)
-                .head("/*", lookupController)
-                .put("/*", deployEndpoint)
-                .post("/*", deployEndpoint)
-                .after("/*", new PostAuthHandler())
-                .exception(Exception.class, new FailureHandler(reposilite.getFailureService()));
+                .get("/api/*", lookupApiEndpoint);
+        }
+
+        this.javalin
+            .get("/*", lookupController)
+            .head("/*", lookupController)
+            .put("/*", deployEndpoint)
+            .post("/*", deployEndpoint)
+            .after("/*", new PostAuthHandler())
+            .exception(Exception.class, new FailureHandler(reposilite.getFailureService()));
 
         if (!servlet) {
             javalin.start(configuration.hostname, configuration.port);

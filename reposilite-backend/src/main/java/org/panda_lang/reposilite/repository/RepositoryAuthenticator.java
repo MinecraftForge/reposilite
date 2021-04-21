@@ -84,4 +84,8 @@ public final class RepositoryAuthenticator {
                 .collect(Collectors.toList()));
     }
 
+    public Authenticator getAuthenticator() {
+        return this.authenticator;
+    }
+
 }

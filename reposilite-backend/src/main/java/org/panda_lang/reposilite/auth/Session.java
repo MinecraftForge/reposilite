@@ -17,7 +17,6 @@
 package org.panda_lang.reposilite.auth;
 
 import org.panda_lang.reposilite.repository.Repository;
-import org.panda_lang.utilities.commons.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,13 +49,22 @@ public final class Session {
                 String name = "/" + repository.getName();
 
                 if (path.startsWith(name)) {
-                    path = StringUtils.replaceFirst(path, name, WILDCARD);
+                    path = WILDCARD + path.substring(name.length());
                     break;
                 }
             }
         }
 
         return path.startsWith(tokenPath) || path.startsWith(tokenPath + "/");
+    }
+
+    public boolean hasAnyPermission(Permission... perms) {
+        for (Permission perm : perms) {
+            if (hasPermission(perm)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public List<Repository> getRepositories() {
