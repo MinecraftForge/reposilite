@@ -27,6 +27,9 @@ import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteContextFactory;
 import org.panda_lang.reposilite.ReposiliteUtils;
+import org.panda_lang.reposilite.auth.Authenticator;
+import org.panda_lang.reposilite.auth.Permission;
+import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataUtils;
@@ -43,17 +46,20 @@ import java.util.Optional;
 public final class LookupApiEndpoint implements Handler {
 
     private final boolean rewritePathsEnabled;
+    private final boolean apiRequiresAuth;
     private final ReposiliteContextFactory contextFactory;
     private final RepositoryAuthenticator repositoryAuthenticator;
     private final RepositoryService repositoryService;
 
     public LookupApiEndpoint(
             boolean rewritePathsEnabled,
+            boolean apiRequiresAuth,
             ReposiliteContextFactory contextFactory,
             RepositoryAuthenticator repositoryAuthenticator,
             RepositoryService repositoryService) {
 
         this.rewritePathsEnabled = rewritePathsEnabled;
+        this.apiRequiresAuth = apiRequiresAuth;
         this.contextFactory = contextFactory;
         this.repositoryAuthenticator = repositoryAuthenticator;
         this.repositoryService = repositoryService;
@@ -100,6 +106,20 @@ public final class LookupApiEndpoint implements Handler {
         }
 
         String uri = normalizedUri.get();
+
+        if (apiRequiresAuth) {
+            Result<Session, String> auth = repositoryAuthenticator.getAuthenticator().authByHeader(context.headers());
+            if (auth.isErr()) {
+                ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.getError());
+                return;
+            }
+
+            if ((!StringUtils.isEmpty(uri) && !"/".equals(uri) && !auth.get().hasPermissionTo('/' + uri))
+                || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
+                ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, "Unauthorized request");
+                return;
+            }
+        }
 
         if ("/".equals(uri) || StringUtils.isEmpty(uri)) {
             ctx.json(repositoryAuthenticator.findAvailableRepositories(context.headers()));

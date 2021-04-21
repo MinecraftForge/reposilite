@@ -74,3 +74,8 @@ title: #onlypanda
 description: Public Maven repository hosted through the Reposilite
 # Accent color used by frontend
 accentColor: #2fd4aa
+
+# API Enabled
+apiEnabled: true
+# API Requires Authentication
+apiRequiresAuth: false

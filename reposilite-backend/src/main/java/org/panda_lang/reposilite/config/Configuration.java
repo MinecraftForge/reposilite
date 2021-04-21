@@ -103,4 +103,11 @@ public final class Configuration implements Serializable {
     @Description("# Accent color used by frontend")
     public String accentColor = "#2fd4aa";
 
+    // API Properties
+    @Description("")
+    @Description("# API Enabled")
+    public boolean apiEnabled = true;
+    @Description("# API Requires Authentication")
+    public boolean apiRequiresAuth = false;
+
 }
