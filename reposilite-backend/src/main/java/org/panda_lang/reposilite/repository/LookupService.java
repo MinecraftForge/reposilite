@@ -44,6 +44,7 @@ public final class LookupService {
     private final RepositoryService repositoryService;
     private final ExecutorService ioService;
     private final FailureService failureService;
+    private final String proxiedStorageRepo;
 
     public LookupService(
             Authenticator authenticator,
@@ -51,7 +52,8 @@ public final class LookupService {
             MetadataService metadataService,
             RepositoryService repositoryService,
             ExecutorService ioService,
-            FailureService failureService) {
+            FailureService failureService,
+            String proxiedStorageRepo) {
 
         this.authenticator = authenticator;
         this.repositoryAuthenticator = repositoryAuthenticator;
@@ -59,6 +61,7 @@ public final class LookupService {
         this.repositoryService = repositoryService;
         this.ioService = ioService;
         this.failureService = failureService;
+        this.proxiedStorageRepo = proxiedStorageRepo;
     }
 
     Result<LookupResponse, ErrorDto> findLocal(ReposiliteContext context) {
@@ -86,6 +89,18 @@ public final class LookupService {
 
         Repository repository = result.get().getValue();
         String requestedFileName = Objects.requireNonNull(ArrayUtils.getLast(requestPath));
+
+        Optional<Artifact> testArtifact = repository.find(requestPath);
+        // This doesn't work for requesting /latest in proxied files, but I don't give a shit...
+        if (!testArtifact.isPresent() && this.proxiedStorageRepo != null && !this.proxiedStorageRepo.isEmpty()) {
+            Repository proxy = this.repositoryService.getRepository(this.proxiedStorageRepo);
+            if (proxy != null) {
+                testArtifact = proxy.find(requestPath);
+                if (testArtifact.isPresent()) {
+                    repository = proxy;
+                }
+            }
+        }
 
         if (requestedFileName.equals("maven-metadata.xml")) {
             return metadataService

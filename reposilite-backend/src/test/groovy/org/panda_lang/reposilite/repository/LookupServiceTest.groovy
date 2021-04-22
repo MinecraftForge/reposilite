@@ -72,7 +72,8 @@ class LookupServiceTest extends ReposiliteTestSpecification {
                 super.reposilite.getMetadataService(),
                 super.reposilite.getRepositoryService(),
                 super.reposilite.ioService,
-                super.reposilite.getFailureService())
+                super.reposilite.getFailureService(),
+                '')
     }
 
 }

@@ -52,6 +52,7 @@ final class ProxyServiceTest extends ReposiliteIntegrationTestSpecification {
         this.failureService = super.reposilite.getFailureService()
         this.proxyService = new ProxyService(
                 true,
+                "",
                 true,
                 1000,
                 1000,
