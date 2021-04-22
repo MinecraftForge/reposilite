@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 public final class ProxyService {
 
     private final boolean storeProxied;
+    private final String proxiedStorageRepo;
     private final boolean proxyPrivate;
     private final int proxyConnectTimeout;
     private final int proxyReadTimeout;
@@ -57,6 +58,7 @@ public final class ProxyService {
 
     public ProxyService(
             boolean storeProxied,
+            String proxiedStorageRepo,
             boolean proxyPrivate,
             int proxyConnectTimeout,
             int proxyReadTimeout,
@@ -67,6 +69,7 @@ public final class ProxyService {
             RepositoryService repositoryService) {
 
         this.storeProxied = storeProxied;
+        this.proxiedStorageRepo = proxiedStorageRepo;
         this.proxyPrivate = proxyPrivate;
         this.proxyConnectTimeout = proxyConnectTimeout;
         this.proxyReadTimeout = proxyReadTimeout;
@@ -167,6 +170,15 @@ public final class ProxyService {
 
         String repositoryName = StringUtils.split(uri.substring(1), "/")[0]; // skip first path separator
         Repository repository = repositoryService.getRepository(repositoryName);
+
+        if (this.proxiedStorageRepo != null && !this.proxiedStorageRepo.isEmpty()) {
+            if (repository != null) { // This *would* be nessasary but this function is never called with a repo prefixed name, and thus all files get proxied into the main repo...
+                uri = '/' + this.proxiedStorageRepo + uri.substring(repositoryName.length() + 1);
+            } else {
+                uri = '/' + this.proxiedStorageRepo + uri;
+            }
+            repository = repositoryService.getRepository(this.proxiedStorageRepo);
+        }
 
         if (repository == null) {
             if (!rewritePathsEnabled) {
