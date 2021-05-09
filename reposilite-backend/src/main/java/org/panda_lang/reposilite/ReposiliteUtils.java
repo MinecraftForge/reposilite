@@ -39,7 +39,7 @@ public final class ReposiliteUtils {
      * @return the normalized uri
      */
     public static Option<String> normalizeUri(boolean rewritePathsEnabled, RepositoryService repositoryService, String uri) {
-        if (uri.startsWith("/")) {
+        while (uri.startsWith("/")) {
             uri = uri.substring(1);
         }
 
