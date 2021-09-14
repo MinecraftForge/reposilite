@@ -1,21 +1,30 @@
 version: "3.9"
+
+x-service:
+  &default-service
+  image: reposilite:${REP_VERSION}
+  build:
+    context: .
+    dockerfile: Dockerfile
+  ports:
+    - ${PORT}:${PORT}
+  env_file:
+    - .env
+  environment:
+    - JAVA_OPTS=-Xmx${MEMORY} -Dreposilite.port=${PORT} ${JAVA_COMPOSE_OPTS}
+    - REPOSILITE_OPTS=${REPOSILITE_COMPOSE_OPTS}
+  volumes:
+    - reposilite-data:/app/data
+  restart: unless-stopped
+  stdin_open: true
+  tty: true
+
 services:
   reposilite:
-    image: reposilite:2.9.22
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - ${PORT}:${PORT}
-    env_file:
-      - .env
-    environment:
-      - JAVA_OPTS=-Xmx${MEMORY} -Dreposilite.port=${PORT} ${JAVA_COMPOSE_OPTS}
-      - REPOSILITE_OPTS=${REPOSILITE_COMPOSE_OPTS}
-    volumes:
-      - reposilite-data:/app/data
-    restart: unless-stopped
-    stdin_open: true
-    tty: true
+    << : *default-service
+  reposilite_latest:
+    << : *default-service
+    image: reposilite:latest
+    
 volumes:
   reposilite-data: {}

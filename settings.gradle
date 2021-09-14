@@ -1,0 +1,13 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net/' }
+    }
+}
+
+rootProject.name = 'ReposiliteRoot'
+
+include ':frontend'
+project(":frontend").projectDir = file("reposilite-frontend")
+include ':backend'
+project(":backend").projectDir = file("reposilite-backend")

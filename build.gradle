@@ -1,0 +1,12 @@
+plugins {
+    id 'com.avast.gradle.docker-compose' version '0.14.9'
+}
+
+evaluationDependsOnChildren()
+
+composeBuild {
+    dependsOn(':backend:build')
+    doFirst {
+        dockerCompose.environment.put('REP_VERSION', project(':backend').version)
+    }
+}

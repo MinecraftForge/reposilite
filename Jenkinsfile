@@ -1,7 +1,11 @@
 @Library('forge-shared-library')_
 
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'gradle:jdk8'
+        }
+    }
     environment {
         DISCORD_WEBHOOK = credentials('forge-discord-jenkins-webhook')
         DISCORD_PREFIX = "Job: Reposilite Branch: ${BRANCH_NAME} Build: #${BUILD_NUMBER}"
@@ -26,8 +30,35 @@ pipeline {
         }
         stage('build') {
             steps {
+                withGradle {
+                    sh './gradlew ${GRADLE_ARGS} composeBuild'
+                }
                 script {
-                    docker.build('reposilite')
+                    gradleVersion(this, properties: ':backend:properties')
+                }
+            }
+            post {
+                success {
+                    writeChangelog(currentBuild, 'build/changelog.txt')
+                }
+            }
+        }
+        stage('publish') {
+            when {
+                not {
+                    changeRequest()
+                }
+            }
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'maven-forge-user', usernameVariable: 'MAVEN_USER', passwordVariable: 'MAVEN_PASSWORD')]) {
+                    withGradle {
+                        sh './gradlew ${GRADLE_ARGS} :backend:publish'
+                    }
+                }
+            }
+             post {
+                success {
+                    build job: 'filegenerator', parameters: [string(name: 'COMMAND', value: "promote ${env.MYGROUP}:${env.MYARTIFACT} ${env.MYVERSION} latest")], propagate: false, wait: false
                 }
             }
         }

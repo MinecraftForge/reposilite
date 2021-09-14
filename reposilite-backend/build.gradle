@@ -1,0 +1,119 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '7.0.0'
+    id 'net.minecraftforge.gradleutils' version '1.+'
+    id 'java'
+    id 'maven-publish'
+}
+
+//group = 'org.panda-lang'
+group = 'net.minecraftforge'
+//version = '2.9.22'
+archivesBaseName = 'reposilite'
+description = 'reposilite-backend'
+java.toolchain.languageVersion = JavaLanguageVersion.of(8)
+
+gradleutils {
+    gitRoot = rootProject.file('.')
+}
+version = gradleutils.getTagOffsetVersion()
+logger.lifecycle('Version: ' + version)
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { // Needed for 'net.dzikoysk:cdn:1.8.0'
+        url = uri('https://repo.panda-lang.org/')
+    }
+}
+
+jar {
+    //dependsOn(':frontend:build')
+    // Be sure to run frontend:build when editing anything in the front end so that these sources are updated
+    // Not hard linked so that the CI doesn't need NPM installed {TODO: build proper image?}
+    manifest {
+        attributes(
+            'Main-Class': 'org.panda_lang.reposilite.ReposiliteLauncher',
+            'Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
+            'GitCommit': gradleutils.gitInfo.abbreviatedId,
+            'Git-Branch': gradleutils.gitInfo.branch,
+            'Multi-Release': true // Some shaded deps
+        )
+    }
+}
+
+shadowJar {
+    exclude('META-INF/resources/')
+    exclude('META-INF/com.android.tools/')
+    exclude('META-INF/maven/')
+    exclude('META-INF/proguard/')
+    exclude('META-INF/NOTICE*')
+    exclude('META-INF/LICENSE*')
+    exclude('META-INF/DEPENDENCIES')
+    exclude('META-INF/ASL*')
+    exclude('META-INF/LGPL*')
+    exclude('META-INF/*kotlin_module')
+}
+
+dependencies {
+    implementation 'io.javalin:javalin-openapi:4.0.0.ALPHA1'
+    implementation 'org.webjars:swagger-ui:3.25.2'
+    implementation 'io.javalin:javalin:4.0.0.ALPHA1'
+    implementation 'org.eclipse.jetty:jetty-server:9.4.40.v20210413'
+    implementation 'org.eclipse.jetty:jetty-webapp:9.4.40.v20210413'
+    implementation 'org.eclipse.jetty.websocket:websocket-server:9.4.40.v20210413'
+    implementation 'commons-io:commons-io:2.8.0'
+    implementation 'commons-logging:commons-logging:1.2'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.12.3'
+    implementation 'com.google.http-client:google-http-client:1.39.2'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+    implementation 'org.apache.httpcomponents:httpcore:4.4.14'
+    implementation 'org.springframework.security:spring-security-crypto:5.4.6'
+    implementation 'net.dzikoysk:cdn:1.8.0'
+    implementation 'info.picocli:picocli:4.6.1'
+    implementation 'com.google.guava:guava:30.1.1-jre'
+    implementation 'org.apache.commons:commons-collections4:4.4'
+    implementation 'org.yaml:snakeyaml:1.28'
+    implementation 'org.fusesource.jansi:jansi:2.3.2'
+    implementation 'org.tinylog:slf4j-tinylog:2.3.1'
+    implementation 'org.tinylog:tinylog-api:2.3.1'
+    implementation 'org.tinylog:tinylog-impl:2.3.1'
+    testImplementation 'com.google.http-client:google-http-client-jackson2:1.39.2'
+    testImplementation 'org.mockito:mockito-inline:3.9.0'
+    testImplementation 'org.mockito:mockito-core:3.9.0'
+    testImplementation 'org.codehaus.groovy:groovy:3.0.7'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.7.1'
+}
+
+java {
+    withSourcesJar()
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from(components.java) // TODO: Don't include shadowjar somehow? Or severly work on making it skinnier
+            artifactId = project.archivesBaseName
+        }
+    }
+    repositories {
+        maven {
+            if (System.env.MAVEN_USER) {
+                url 'https://maven.minecraftforge.net/'
+                authentication {
+                    basic(BasicAuthentication)
+                }
+                credentials {
+                    username = System.env.MAVEN_USER ?: 'not'
+                    password = System.env.MAVEN_PASSWORD ?: 'set'
+                }
+            } else {
+                url 'file://' + rootProject.file('repo').getAbsolutePath()
+            }
+        }
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
