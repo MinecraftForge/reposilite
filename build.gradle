@@ -5,7 +5,7 @@ plugins {
 evaluationDependsOnChildren()
 
 composeBuild {
-    dependsOn(':backend:build')
+    dependsOn(':backend:shadowJar')
     doFirst {
         dockerCompose.environment.put('REP_VERSION', project(':backend').version)
     }
