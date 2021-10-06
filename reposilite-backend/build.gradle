@@ -23,7 +23,7 @@ repositories {
     mavenLocal()
     mavenCentral()
     maven { // Needed for 'net.dzikoysk:cdn:1.8.0'
-        url = uri('https://repo.panda-lang.org/')
+        url = uri('https://repo.panda-lang.org/releases/')
     }
 }
 
