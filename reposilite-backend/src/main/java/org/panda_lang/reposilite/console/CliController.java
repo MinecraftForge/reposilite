@@ -21,9 +21,9 @@ import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteContextFactory;
 import org.panda_lang.reposilite.ReposiliteExecutor;
-import org.panda_lang.reposilite.ReposiliteWriter;
 import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Session;
+import org.panda_lang.reposilite.log.ReposiliteWriter;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Result;
 

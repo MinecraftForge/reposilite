@@ -14,4 +14,4 @@
 # limitations under the License.
 #
 
-org.panda_lang.reposilite.ReposiliteWriter
+org.panda_lang.reposilite.log.ReposiliteWriter

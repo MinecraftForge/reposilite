@@ -18,7 +18,7 @@ package org.panda_lang.reposilite.error
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
-import org.panda_lang.reposilite.ReposiliteWriter
+import org.panda_lang.reposilite.log.ReposiliteWriter
 
 import static org.junit.jupiter.api.Assertions.assertEquals
 import static org.junit.jupiter.api.Assertions.assertTrue

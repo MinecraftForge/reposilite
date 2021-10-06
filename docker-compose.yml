@@ -11,7 +11,7 @@ x-service:
   env_file:
     - .env
   environment:
-    - JAVA_OPTS=-Xmx${MEMORY} -Dreposilite.port=${PORT} ${JAVA_COMPOSE_OPTS}
+    - JAVA_OPTS=-Xmx${MEMORY} -Dtinylog.configuration=/app/data/tinylog.properties -Dreposilite.port=${PORT} ${JAVA_COMPOSE_OPTS}
     - REPOSILITE_OPTS=${REPOSILITE_COMPOSE_OPTS}
   volumes:
     - reposilite-data:/app/data

@@ -20,7 +20,7 @@ import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 import org.panda_lang.reposilite.ReposiliteConstants
 import org.panda_lang.reposilite.ReposiliteTestSpecification
-import org.panda_lang.reposilite.ReposiliteWriter
+import org.panda_lang.reposilite.log.ReposiliteWriter
 import org.panda_lang.utilities.commons.text.Joiner
 
 import static org.junit.jupiter.api.Assertions.assertTrue

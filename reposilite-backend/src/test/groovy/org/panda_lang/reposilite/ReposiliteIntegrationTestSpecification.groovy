@@ -26,6 +26,7 @@ import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.io.TempDir
+import org.panda_lang.reposilite.log.ReposiliteWriter
 import org.panda_lang.utilities.commons.ArrayUtils
 
 @CompileStatic

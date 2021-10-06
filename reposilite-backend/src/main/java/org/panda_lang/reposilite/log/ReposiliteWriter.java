@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.panda_lang.reposilite;
+package org.panda_lang.reposilite.log;
 
 import org.apache.commons.collections4.queue.CircularFifoQueue;
 import org.tinylog.core.LogEntry;

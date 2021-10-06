@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-package org.panda_lang.reposilite
+package org.panda_lang.reposilite.log
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
+import org.panda_lang.reposilite.Reposilite
+import org.panda_lang.reposilite.log.ReposiliteWriter
 
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.Consumer

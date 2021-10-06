@@ -43,6 +43,7 @@ jar {
 }
 
 shadowJar {
+    mergeServiceFiles()
     exclude('META-INF/resources/')
     exclude('META-INF/com.android.tools/')
     exclude('META-INF/maven/')
