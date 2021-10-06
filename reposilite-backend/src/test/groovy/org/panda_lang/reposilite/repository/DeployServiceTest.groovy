@@ -39,7 +39,7 @@ class DeployServiceTest extends ReposiliteTestSpecification {
         def deployService = new DeployService(
                 true,
                 false,
-                super.reposilite.authenticator,
+                super.reposilite.getAuthService(),
                 new RepositoryService(
                         super.workingDirectory.getAbsolutePath(),
                         '0MB',
@@ -49,7 +49,7 @@ class DeployServiceTest extends ReposiliteTestSpecification {
                 ),
                 super.reposilite.metadataService)
 
-        super.reposilite.tokenService.createToken('/', ALIAS, 'rw', TOKEN)
+        super.reposilite.getAuthService().createToken('/', ALIAS, 'rw', TOKEN)
         def context = createAuthenticatedContext('/releases/a/b/c.txt')
 
         def result = deployService.deploy(context)
@@ -62,7 +62,7 @@ class DeployServiceTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should check write permission' () {
-        super.reposilite.getTokenService().createToken('/', ALIAS, 'r', TOKEN)
+        super.reposilite.getAuthService().createToken('/', ALIAS, 'r', TOKEN)
         def deployService = super.reposilite.getDeployService()
 
         def context = createAuthenticatedContext('/releases/a/b/c.txt')

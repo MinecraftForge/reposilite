@@ -21,6 +21,7 @@ import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
+import java.io.File;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -29,7 +30,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public final class TokenService {
+final class TokenService {
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     public static final BCryptPasswordEncoder B_CRYPT_TOKENS_ENCODER = new BCryptPasswordEncoder();
@@ -37,7 +38,7 @@ public final class TokenService {
     private final Map<String, Token> tokens = new HashMap<>();
     private final TokenStorage database;
 
-    public TokenService(String workingDirectory) {
+    public TokenService(File workingDirectory) {
         this.database = new TokenStorage(this, workingDirectory);
     }
 

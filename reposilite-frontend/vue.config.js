@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+const { argv } = require('yargs')
+
 module.exports = {
   publicPath:
     process.env.NODE_ENV === 'production'
@@ -27,15 +29,21 @@ module.exports = {
   },
   chainWebpack: config => {
     config.optimization.delete('splitChunks')
+    config.plugin('define').tap(options => {
+      if (argv.backend_url !== undefined) {
+        options[0]['process.env'].BACKEND_URL = '"' + argv.backend_url + '"'
+      }
+      return options
+    })
 
     // Vue removes quotes from attributes which causes bugs in placeholders with spaces
     // ~ https://github.com/dzikoysk/reposilite/issues/209
     config.plugin('html')
       .tap(args => {
         if (args[0].minify) {
-          args[0].minify.removeAttributeQuotes = false;
+          args[0].minify.removeAttributeQuotes = false
         }
-        return args;
-    })
+        return args
+      })
   }
 }

@@ -36,7 +36,7 @@ pipeline {
                     sh './gradlew ${GRADLE_ARGS} composeBuild'
                 }
                 script {
-                    gradleVersion(this, properties: ':backend:properties')
+                    gradleVersion(this, ':backend:properties')
                 }
             }
             post {
@@ -45,6 +45,7 @@ pipeline {
                 }
             }
         }
+        /*
         stage('publish') {
             when {
                 not {
@@ -64,6 +65,7 @@ pipeline {
                 }
             }
         }
+        */
     }
     post {
         always {

@@ -43,7 +43,7 @@ class CliControllerTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should authorize and send messages' () {
-        def result = super.reposilite.getTokenService().createToken('/', 'admin', 'rwm')
+        def result = super.reposilite.getAuthService().createToken('/', 'admin', 'rwm')
         def output = new StringBuilder()
 
         def session = connect("admin", result.getKey(), { s, message ->
@@ -69,7 +69,7 @@ class CliControllerTest extends ReposiliteIntegrationTestSpecification {
             Thread.sleep(50)
         }
     }
-    
+
     private Session connect(String username, String password, BiConsumer<Session, String> messageConsumer) throws Exception {
         def webSocketClient = new WebSocketClient()
         webSocketClient.start()

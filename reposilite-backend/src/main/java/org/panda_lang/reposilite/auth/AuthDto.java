@@ -19,6 +19,7 @@ package org.panda_lang.reposilite.auth;
 import java.io.Serializable;
 import java.util.List;
 
+@SuppressWarnings("serial")
 final class AuthDto implements Serializable {
 
     private final String path;

@@ -19,15 +19,9 @@ package org.panda_lang.reposilite;
 import io.javalin.Javalin;
 import io.javalin.core.JavalinConfig;
 import io.javalin.core.JavalinServer;
-import io.javalin.plugin.openapi.OpenApiOptions;
-import io.javalin.plugin.openapi.OpenApiPlugin;
-import io.javalin.plugin.openapi.ui.SwaggerOptions;
-import io.swagger.v3.oas.models.info.Info;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.panda_lang.reposilite.auth.AuthEndpoint;
-import org.panda_lang.reposilite.auth.PostAuthHandler;
 import org.panda_lang.reposilite.config.Configuration;
 import org.panda_lang.reposilite.console.CliController;
 import org.panda_lang.reposilite.console.RemoteExecutionEndpoint;
@@ -36,18 +30,15 @@ import org.panda_lang.reposilite.repository.DeployEndpoint;
 import org.panda_lang.reposilite.repository.LookupApiEndpoint;
 import org.panda_lang.reposilite.repository.LookupController;
 import org.panda_lang.reposilite.resource.FrontendHandler;
-import org.panda_lang.reposilite.resource.WebJarsHandler;
 import org.panda_lang.utilities.commons.function.Option;
 
 public final class ReposiliteHttpServer {
 
     private final Reposilite reposilite;
-    private final boolean servlet;
     private Javalin javalin;
 
-    ReposiliteHttpServer(Reposilite reposilite, boolean servlet) {
+    ReposiliteHttpServer(Reposilite reposilite) {
         this.reposilite = reposilite;
-        this.servlet = servlet;
     }
 
     void start(Configuration configuration, Runnable onStart) {
@@ -63,8 +54,9 @@ public final class ReposiliteHttpServer {
 
         this.javalin = create(configuration)
                 .before(ctx -> reposilite.getStatsService().record(ctx.req.getRequestURI()))
-                .get("/webjars/*", new WebJarsHandler())
                 .get("/js/app.js", new FrontendHandler(reposilite));
+
+        reposilite.getAuthService().register(configuration, this.javalin);
 
         if (configuration.apiEnabled) {
             LookupApiEndpoint lookupApiEndpoint = new LookupApiEndpoint(
@@ -78,29 +70,26 @@ public final class ReposiliteHttpServer {
             CliController cliController = new CliController(
                     reposilite.getContextFactory(),
                     reposilite.getExecutor(),
-                    reposilite.getAuthenticator(),
+                    reposilite.getAuthService(),
                     reposilite.getConsole());
 
             this.javalin
-                .get("/api/auth", new AuthEndpoint(reposilite.getAuthService()))
-                .post("/api/execute", new RemoteExecutionEndpoint(reposilite.getAuthenticator(), reposilite.getContextFactory(), reposilite.getConsole()))
+                .post("/api/execute", new RemoteExecutionEndpoint(reposilite.getAuthService(), reposilite.getContextFactory(), reposilite.getConsole()))
                 .ws("/api/cli", cliController)
                 .get("/api", lookupApiEndpoint)
                 .get("/api/*", lookupApiEndpoint);
         }
+
 
         this.javalin
             .get("/*", lookupController)
             .head("/*", lookupController)
             .put("/*", deployEndpoint)
             .post("/*", deployEndpoint)
-            .after("/*", new PostAuthHandler())
             .exception(Exception.class, new FailureHandler(reposilite.getFailureService()));
 
-        if (!servlet) {
-            javalin.start(configuration.hostname, configuration.port);
-            onStart.run();
-        }
+        javalin.start(configuration.hostname, configuration.port);
+        onStart.run();
     }
 
     void stop() {
@@ -108,9 +97,7 @@ public final class ReposiliteHttpServer {
     }
 
     private Javalin create(Configuration configuration) {
-        return servlet
-                ? Javalin.createStandalone(config -> configure(configuration, config))
-                : Javalin.create(config -> configure(configuration, config));
+        return Javalin.create(config -> configure(configuration, config));
     }
 
     private void configure(Configuration configuration, JavalinConfig config) {
@@ -137,22 +124,6 @@ public final class ReposiliteHttpServer {
         config.enforceSsl = configuration.enforceSsl;
         config.enableCorsForAllOrigins();
         config.showJavalinBanner = false;
-
-        if (configuration.swagger) {
-            Info applicationInfo = new Info()
-                    .description(ReposiliteConstants.NAME)
-                    .version(ReposiliteConstants.VERSION);
-
-            SwaggerOptions swaggerOptions = new SwaggerOptions("/swagger")
-                    .title("Reposilite API documentation");
-
-            OpenApiOptions options = new OpenApiOptions(applicationInfo)
-                    .path("/swagger-docs")
-                    // .reDoc(new ReDocOptions("/redoc"))
-                    .swagger(swaggerOptions);
-
-            config.registerPlugin(new OpenApiPlugin(options));
-        }
 
         if (configuration.debugEnabled) {
             // config.requestCacheSize = FilesUtils.displaySizeToBytesCount(System.getProperty("reposilite.requestCacheSize", "8MB"));

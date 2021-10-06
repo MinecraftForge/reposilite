@@ -16,6 +16,7 @@
 
 package org.panda_lang.reposilite;
 
+@SuppressWarnings("serial")
 public final class ReposiliteException extends RuntimeException {
 
     public ReposiliteException(String message, Throwable cause) {

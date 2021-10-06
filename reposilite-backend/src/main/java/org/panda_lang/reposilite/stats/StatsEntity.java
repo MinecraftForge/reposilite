@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
+@SuppressWarnings("serial")
 public final class StatsEntity implements Serializable {
 
     private final ConcurrentMap<String, Integer> records = new ConcurrentHashMap<>();

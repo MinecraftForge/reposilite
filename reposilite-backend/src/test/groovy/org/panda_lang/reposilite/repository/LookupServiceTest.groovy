@@ -63,16 +63,13 @@ class LookupServiceTest extends ReposiliteTestSpecification {
     private LookupService createLookupService() {
         def repositoryAuthenticator = new RepositoryAuthenticator(
                 false, // disable path rewrite option which is enabled by default
-                super.reposilite.getAuthenticator(),
+                super.reposilite.getAuthService(),
                 super.reposilite.getRepositoryService())
 
         return new LookupService(
-                super.reposilite.getAuthenticator(),
                 repositoryAuthenticator,
                 super.reposilite.getMetadataService(),
                 super.reposilite.getRepositoryService(),
-                super.reposilite.ioService,
-                super.reposilite.getFailureService(),
                 '')
     }
 

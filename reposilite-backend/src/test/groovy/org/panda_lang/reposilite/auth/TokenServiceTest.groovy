@@ -32,12 +32,12 @@ class TokenServiceTest {
 
     @BeforeEach
     void prepare() {
-        this.tokenService = new TokenService(workingDirectory.getAbsolutePath())
+        this.tokenService = new TokenService(workingDirectory)
     }
 
     @Test
     void 'should save and load' () {
-        def tempService = new TokenService(workingDirectory.getAbsolutePath())
+        def tempService = new TokenService(workingDirectory)
         tempService.createToken('path', 'alias', 'rw')
         tempService.saveTokens()
         tokenService.loadTokens() // uses the same file

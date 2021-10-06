@@ -37,6 +37,10 @@ public final class YamlUtils {
 
     private YamlUtils() { }
 
+    public static <T> T load(String data, Class<T> type) {
+        return YAML.loadAs(data, type);
+    }
+
     public static <T> T load(File file, Class<T> type) throws IOException {
         return YAML.loadAs(FileUtils.getContentOfFile(file), type);
     }

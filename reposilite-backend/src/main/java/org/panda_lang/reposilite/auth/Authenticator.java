@@ -23,18 +23,20 @@ import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 
-public final class Authenticator {
+final class Authenticator {
 
     private final RepositoryService repositoryService;
     private final TokenService tokenService;
+    TokenService getTokenService() { return this.tokenService; }
 
-    public Authenticator(RepositoryService repositoryService, TokenService tokenService) {
+    public Authenticator(File workingDirectory, RepositoryService repositoryService) {
         this.repositoryService = repositoryService;
-        this.tokenService = tokenService;
+        this.tokenService = new TokenService(workingDirectory);
     }
 
     public Result<Session, String> authByUri(Map<String, String> header, String uri) {

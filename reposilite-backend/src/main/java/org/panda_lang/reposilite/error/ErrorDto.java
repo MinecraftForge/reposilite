@@ -18,6 +18,7 @@ package org.panda_lang.reposilite.error;
 
 import java.io.Serializable;
 
+@SuppressWarnings("serial")
 public final class ErrorDto implements Serializable {
 
     private final int status;

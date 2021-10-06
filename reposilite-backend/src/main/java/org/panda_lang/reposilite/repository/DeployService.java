@@ -20,7 +20,7 @@ import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteUtils;
-import org.panda_lang.reposilite.auth.Authenticator;
+import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
@@ -36,20 +36,20 @@ public final class DeployService {
 
     private final boolean deployEnabled;
     private final boolean rewritePathsEnabled;
-    private final Authenticator authenticator;
+    private final AuthService auth;
     private final RepositoryService repositoryService;
     private final MetadataService metadataService;
 
     public DeployService(
             boolean deployEnabled,
             boolean rewritePathsEnabled,
-            Authenticator authenticator,
+            AuthService auth,
             RepositoryService repositoryService,
             MetadataService metadataService) {
 
         this.deployEnabled = deployEnabled;
         this.rewritePathsEnabled = rewritePathsEnabled;
-        this.authenticator = authenticator;
+        this.auth = auth;
         this.repositoryService = repositoryService;
         this.metadataService = metadataService;
     }
@@ -66,7 +66,7 @@ public final class DeployService {
         }
 
         String uri = uriValue.get();
-        Result<Session, String> authResult = this.authenticator.authByUri(context.headers(), uri);
+        Result<Session, String> authResult = this.auth.authByUri(context.headers(), uri);
 
         if (authResult.isErr()) {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, authResult.getError());

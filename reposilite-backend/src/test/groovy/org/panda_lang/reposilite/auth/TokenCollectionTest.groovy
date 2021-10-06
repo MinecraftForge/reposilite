@@ -30,9 +30,9 @@ class TokenCollectionTest {
         def tokens = [ token, token ]
 
         def tokenCollection = new TokenCollection()
-        tokenCollection.setTokens(tokens)
+        tokens.each { tokenCollection.tokens.add(it) }
 
-        assertEquals tokens, tokenCollection.getTokens()
+        assertEquals tokens, tokenCollection.tokens
     }
 
 }

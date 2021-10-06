@@ -18,7 +18,7 @@ package org.panda_lang.reposilite.repository;
 
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.ReposiliteUtils;
-import org.panda_lang.reposilite.auth.Authenticator;
+import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
@@ -33,12 +33,13 @@ import java.util.stream.Collectors;
 public final class RepositoryAuthenticator {
 
     private final boolean rewritePathsEnabled;
-    private final Authenticator authenticator;
+    private final AuthService auth;
+    public AuthService getAuthService() { return this.auth; }
     private final RepositoryService repositoryService;
 
-    public RepositoryAuthenticator(boolean rewritePathsEnabled, Authenticator authenticator, RepositoryService repositoryService) {
+    public RepositoryAuthenticator(boolean rewritePathsEnabled, AuthService auth, RepositoryService repositoryService) {
         this.rewritePathsEnabled = rewritePathsEnabled;
-        this.authenticator = authenticator;
+        this.auth = auth;
         this.repositoryService = repositoryService;
     }
 
@@ -64,7 +65,7 @@ public final class RepositoryAuthenticator {
 
         // auth hidden repositories
         if (repository.isHidden()) {
-            Result<Session, String> authResult = authenticator.authByUri(headers, normalizedUri);
+            Result<Session, String> authResult = auth.authByUri(headers, normalizedUri);
 
             if (authResult.isErr()) {
                 return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, "Unauthorized request");
@@ -75,7 +76,7 @@ public final class RepositoryAuthenticator {
     }
 
     FileListDto findAvailableRepositories(Map<String, String> headers) {
-        Option<Session> session = authenticator.authByHeader(headers).toOption();
+        Option<Session> session = auth.authByHeader(headers).toOption();
 
         return new FileListDto(repositoryService.getRepositories().stream()
                 .filter(repository -> repository.isPublic() || session.map(value -> value.getRepositoryNames().contains(repository.getName())).orElseGet(false))
@@ -83,9 +84,4 @@ public final class RepositoryAuthenticator {
                 .map(FileDetailsDto::of)
                 .collect(Collectors.toList()));
     }
-
-    public Authenticator getAuthenticator() {
-        return this.authenticator;
-    }
-
 }

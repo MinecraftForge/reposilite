@@ -31,6 +31,7 @@ import org.panda_lang.utilities.commons.collection.Pair
 import static org.junit.jupiter.api.Assertions.assertEquals
 import static org.junit.jupiter.api.Assertions.assertTrue
 
+@SuppressWarnings("deprecation")
 @CompileStatic
 class RemoteExecutionEndpointTest extends ReposiliteIntegrationTestSpecification {
 
@@ -44,8 +45,8 @@ class RemoteExecutionEndpointTest extends ReposiliteIntegrationTestSpecification
 
     @BeforeEach
     void prepare () {
-        super.reposilite.getTokenService().createToken('', MANAGER_ALIAS, 'm', MANAGER_TOKEN);
-        super.reposilite.getTokenService().createToken('', STANDARD_ALIAS, '', STANDARD_TOKEN);
+        super.reposilite.getAuthService().createToken('', MANAGER_ALIAS, 'm', MANAGER_TOKEN);
+        super.reposilite.getAuthService().createToken('', STANDARD_ALIAS, '', STANDARD_TOKEN);
     }
 
     @Test

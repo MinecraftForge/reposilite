@@ -17,24 +17,71 @@
 package org.panda_lang.reposilite.auth;
 
 import org.apache.http.HttpStatus;
-import org.panda_lang.reposilite.error.ErrorDto;
+import org.jetbrains.annotations.Nullable;
+import org.panda_lang.reposilite.Reposilite;
+import org.panda_lang.reposilite.ReposiliteConfiguration;
+import org.panda_lang.reposilite.config.Configuration;
+import org.panda_lang.reposilite.console.Console;
+import org.panda_lang.reposilite.repository.RepositoryService;
+import org.panda_lang.utilities.commons.collection.Pair;
 import org.panda_lang.utilities.commons.function.Result;
 
+import io.javalin.Javalin;
+
+import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 
-public final class AuthService {
+public final class AuthService implements ReposiliteConfiguration {
+    private final Authenticator auth;
+    Authenticator getAuthenticator() { return this.auth; }
 
-    private final Authenticator authenticator;
-
-    public AuthService(Authenticator authenticator) {
-        this.authenticator = authenticator;
+    public AuthService(File workingDirectory, RepositoryService repositoryService) {
+        this.auth = new Authenticator(workingDirectory, repositoryService);
     }
 
-    Result<AuthDto, ErrorDto> authByHeader(Map<String, String> headers) {
-        return authenticator
-                .authByHeader(headers)
-                .map(session -> new AuthDto(session.getToken().getPath(), session.getToken().getPermissions(), session.getRepositoryNames()))
-                .mapErr(error -> new ErrorDto(HttpStatus.SC_UNAUTHORIZED, error));
+    public void register(Configuration configuration, Javalin javalin) {
+        javalin.after("/*", ctx -> {
+            if (ctx.status() == HttpStatus.SC_UNAUTHORIZED) {
+                ctx.header("www-authenticate", "Basic realm=\"Reposilite\", charset=\"UTF-8\"");
+            }
+        });
     }
 
+    @Override
+    public void configure(Reposilite reposilite) {
+        TokenService tokenService = this.auth.getTokenService();
+
+        try {
+            tokenService.loadTokens();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        Console console = reposilite.getConsole();
+        console.registerCommand(new ChAliasCommand(tokenService));
+        console.registerCommand(new ChmodCommand(tokenService));
+        console.registerCommand(new KeygenCommand(tokenService));
+        console.registerCommand(new RevokeCommand(tokenService));
+        console.registerCommand(new TokensCommand(tokenService));
+    }
+
+    public Result<Session, String> authByUri(Map<String, String> header, String uri) {
+        return this.auth.authByUri(header, uri);
+    }
+
+    public Result<Session, String> authByHeader(Map<String, String> header) {
+        return this.auth.authByHeader(header);
+    }
+    public Result<Session, String> authByCredentials(@Nullable String credentials) {
+        return this.auth.authByCredentials(credentials);
+    }
+
+    public Pair<String, Token> createToken(String path, String alias, String permissions) {
+        return this.auth.getTokenService().createToken(path, alias, permissions);
+    }
+
+    public Pair<String, Token> createToken(String path, String alias, String permissions, String token) {
+        return this.auth.getTokenService().createToken(path, alias, permissions, token);
+    }
 }

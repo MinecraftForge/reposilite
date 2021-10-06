@@ -16,8 +16,6 @@
 
 package org.panda_lang.reposilite.utils;
 
-import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.utilities.commons.IOUtils;
@@ -31,8 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.text.CharacterIterator;
 import java.text.StringCharacterIterator;
 import java.util.List;
@@ -59,16 +57,12 @@ public final class FilesUtils {
 
     private FilesUtils() {}
 
-    @SuppressWarnings({ "UnstableApiUsage", "deprecation" })
     public static void writeFileChecksums(Path path) throws IOException {
-        Files.touch(new File(path + ".md5"));
-        Files.touch(new File(path + ".sha1"));
-
-        Path md5FileFile = Paths.get(path + ".md5");
-        Path sha1FileFile = Paths.get(path + ".sha1");
-
-        FileUtils.writeStringToFile(md5FileFile.toFile(), Files.hash(path.toFile(), Hashing.md5()).toString(), StandardCharsets.UTF_8);
-        FileUtils.writeStringToFile(sha1FileFile.toFile(), Files.hash(path.toFile(), Hashing.sha1()).toString(), StandardCharsets.UTF_8);
+        for (HashFunction func : new HashFunction[] { HashFunction.MD5, HashFunction.SHA1}) {
+            File file = new File(path.toString() + '.' + func.getExtension());
+            String hash = func.hash(path);
+            Files.write(file.toPath(), hash.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     public static long displaySizeToBytesCount(String displaySize) {

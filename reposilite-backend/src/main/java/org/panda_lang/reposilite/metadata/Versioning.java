@@ -23,6 +23,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import java.io.Serializable;
 import java.util.Collection;
 
+@SuppressWarnings("serial")
 @JacksonXmlRootElement(localName = "versioning")
 final class Versioning implements Serializable {
 

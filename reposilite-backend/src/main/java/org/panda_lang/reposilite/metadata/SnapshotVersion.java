@@ -20,6 +20,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
 import java.io.Serializable;
 
+@SuppressWarnings("serial")
 @JacksonXmlRootElement(localName = "snapshotVersion")
 final class SnapshotVersion implements Serializable {
 

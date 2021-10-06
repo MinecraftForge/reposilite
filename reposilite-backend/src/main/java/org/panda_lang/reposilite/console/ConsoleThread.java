@@ -37,24 +37,24 @@ final class ConsoleThread extends Thread {
 
     @Override
     public void run() {
-        Scanner in = new Scanner(source);
-
-        if (!in.hasNextLine()) {
-            Reposilite.getLogger().warn("Interactive CLI is not available in current environment.");
-            Reposilite.getLogger().warn("Solution for Docker users: https://docs.docker.com/engine/reference/run/#foreground");
-            return;
-        }
-
-        do {
-            String command = in.nextLine();
-
-            try {
-                console.defaultExecute(command);
-            } catch (Exception exception) {
-                failureService.throwException("Command: " + command, exception);
+        try (Scanner in = new Scanner(source)) {
+            if (!in.hasNextLine()) {
+                Reposilite.getLogger().warn("Interactive CLI is not available in current environment.");
+                Reposilite.getLogger().warn("Solution for Docker users: https://docs.docker.com/engine/reference/run/#foreground");
+                return;
             }
+
+            do {
+                String command = in.nextLine();
+
+                try {
+                    console.defaultExecute(command);
+                } catch (Exception exception) {
+                    failureService.throwException("Command: " + command, exception);
+                }
+            }
+            while (!isInterrupted() && in.hasNextLine());
         }
-        while (!isInterrupted() && in.hasNextLine());
     }
 
 }

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "serve": "vue-cli-service serve",
+    "prod": "vue-cli-service serve --mode development --backend_url https://maven.minecraftforge.net/",
     "build": "vue-cli-service build",
     "lint": "vue-cli-service lint"
   },

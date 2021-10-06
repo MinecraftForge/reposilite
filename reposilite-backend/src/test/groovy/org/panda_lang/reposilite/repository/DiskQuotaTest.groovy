@@ -30,7 +30,6 @@ final class DiskQuotaTest {
     public File workingDirectory
 
     @Test
-    @SuppressWarnings('GroovyAccessibility')
     void 'should create quota of the given percentage' () {
         def quota = DiskQuota.of(workingDirectory, '90%')
         def size = quota.@quota.longValue()
@@ -47,7 +46,6 @@ final class DiskQuotaTest {
     }
 
     @Test
-    @SuppressWarnings('GroovyAccessibility')
     void 'should create quota of the given size' () {
         def size = 10L * 1024 * 1024 * 1024
         def quota = DiskQuota.of(workingDirectory, '10GB')

@@ -27,7 +27,6 @@ import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteContextFactory;
 import org.panda_lang.reposilite.ReposiliteUtils;
-import org.panda_lang.reposilite.auth.Authenticator;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
@@ -108,7 +107,7 @@ public final class LookupApiEndpoint implements Handler {
         String uri = normalizedUri.get();
 
         if (apiRequiresAuth) {
-            Result<Session, String> auth = repositoryAuthenticator.getAuthenticator().authByHeader(context.headers());
+            Result<Session, String> auth = repositoryAuthenticator.getAuthService().authByHeader(context.headers());
             if (auth.isErr()) {
                 ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.getError());
                 return;

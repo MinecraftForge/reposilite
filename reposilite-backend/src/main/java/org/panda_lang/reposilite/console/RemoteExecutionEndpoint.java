@@ -27,7 +27,7 @@ import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteContextFactory;
-import org.panda_lang.reposilite.auth.Authenticator;
+import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
@@ -40,12 +40,12 @@ public final class RemoteExecutionEndpoint implements Handler {
 
     private static final int MAX_COMMAND_LENGTH = 1024;
 
-    private final Authenticator authenticator;
+    private final AuthService auth;
     private final ReposiliteContextFactory contextFactory;
     private final Console console;
 
-    public RemoteExecutionEndpoint(Authenticator authenticator, ReposiliteContextFactory contextFactory, Console console) {
-        this.authenticator = authenticator;
+    public RemoteExecutionEndpoint(AuthService auth, ReposiliteContextFactory contextFactory, Console console) {
+        this.auth = auth;
         this.contextFactory = contextFactory;
         this.console = console;
     }
@@ -78,7 +78,7 @@ public final class RemoteExecutionEndpoint implements Handler {
         ReposiliteContext context = contextFactory.create(ctx);
         Reposilite.getLogger().info("REMOTE EXECUTION " + context.uri() + " from " + context.address());
 
-        Result<Session, String> authResult = authenticator.authByHeader(context.headers());
+        Result<Session, String> authResult = auth.authByHeader(context.headers());
 
         if (authResult.isErr()) {
             ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, authResult.getError());

@@ -20,9 +20,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.auth.Authenticator;
 import org.panda_lang.reposilite.error.ErrorDto;
-import org.panda_lang.reposilite.error.FailureService;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataService;
 import org.panda_lang.reposilite.metadata.MetadataUtils;
@@ -34,33 +32,23 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 
 public final class LookupService {
 
-    private final Authenticator authenticator;
     private final RepositoryAuthenticator repositoryAuthenticator;
     private final MetadataService metadataService;
     private final RepositoryService repositoryService;
-    private final ExecutorService ioService;
-    private final FailureService failureService;
     private final String proxiedStorageRepo;
 
     public LookupService(
-            Authenticator authenticator,
             RepositoryAuthenticator repositoryAuthenticator,
             MetadataService metadataService,
             RepositoryService repositoryService,
-            ExecutorService ioService,
-            FailureService failureService,
             String proxiedStorageRepo) {
 
-        this.authenticator = authenticator;
         this.repositoryAuthenticator = repositoryAuthenticator;
         this.metadataService = metadataService;
         this.repositoryService = repositoryService;
-        this.ioService = ioService;
-        this.failureService = failureService;
         this.proxiedStorageRepo = proxiedStorageRepo;
     }
 

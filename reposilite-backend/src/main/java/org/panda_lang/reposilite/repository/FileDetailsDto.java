@@ -26,6 +26,7 @@ import java.io.Serializable;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 
+@SuppressWarnings("serial")
 final class FileDetailsDto implements Serializable, Comparable<FileDetailsDto> {
 
     public static final String FILE = "file";

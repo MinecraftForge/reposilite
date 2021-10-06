@@ -20,6 +20,7 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 
 import java.io.Serializable;
 
+@SuppressWarnings("serial")
 @JacksonXmlRootElement(localName = "metadata")
 final class Metadata implements Serializable {
 

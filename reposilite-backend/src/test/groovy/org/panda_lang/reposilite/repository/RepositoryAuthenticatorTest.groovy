@@ -18,14 +18,15 @@ package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
-import org.panda_lang.reposilite.AuthenticatorSpecification
+import org.panda_lang.reposilite.auth.AuthService
+import org.panda_lang.reposilite.auth.AuthenticatorSpecification
 
 import static org.junit.jupiter.api.Assertions.assertEquals
 
 @CompileStatic
 class RepositoryAuthenticatorTest extends AuthenticatorSpecification {
 
-    static final RepositoryAuthenticator REPOSITORY_AUTHENTICATOR = new RepositoryAuthenticator(true, AUTHENTICATOR, REPOSITORY_SERVICE)
+    static final RepositoryAuthenticator REPOSITORY_AUTHENTICATOR = new RepositoryAuthenticator(true, new AuthService(WORK_DIR, REPOSITORY_SERVICE), REPOSITORY_SERVICE)
 
     @Test
     void 'should not auth invalid repository uri' () {

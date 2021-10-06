@@ -34,14 +34,9 @@ class ReposiliteTestSpecification extends ReposiliteTestSpecificationExtension {
     protected void before() throws Exception {
         try {
             System.setProperty(TINYLOG_WRITER_PROPERTY, 'target/log.txt')
-            this.reposilite = new Reposilite('', workingDirectory.getAbsolutePath(), false, true)
-
+            this.reposilite = new Reposilite('', workingDirectory.getAbsolutePath(), true)
             FileUtils.copyDirectory(new File("src/test/workspace/repositories"), new File(workingDirectory, "repositories"));
-            this.reposilite.repositoryService.load(this.reposilite.configuration)
-
-            for (def configuration : reposilite.configurations()) {
-                configuration.configure(reposilite)
-            }
+            this.reposilite.load()
         } finally {
             System.clearProperty(TINYLOG_WRITER_PROPERTY)
         }

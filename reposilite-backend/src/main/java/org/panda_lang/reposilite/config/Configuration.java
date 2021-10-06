@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+@SuppressWarnings("serial")
 public final class Configuration implements Serializable {
 
     @Description("# ~~~~~~~~~~~~~~~~~~~~~~ #")
@@ -43,8 +44,6 @@ public final class Configuration implements Serializable {
     @Description("# Cloudflare: CF-Connecting-IP")
     @Description("# Popular: X-Real-IP")
     public String forwardedIp = "X-Forwarded-For";
-    @Description("# Enable Swagger (/swagger-docs) and Swagger UI (/swagger)")
-    public Boolean swagger = false;
     @Description("# Debug")
     public Boolean debugEnabled = false;
 

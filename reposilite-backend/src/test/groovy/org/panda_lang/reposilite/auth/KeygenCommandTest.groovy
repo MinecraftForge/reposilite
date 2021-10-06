@@ -27,7 +27,7 @@ class KeygenCommandTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should create new token' () {
-        def tokenService = super.reposilite.getTokenService()
+        def tokenService = super.reposilite.getAuthService().getAuthenticator().getTokenService()
         tokenService.createToken('/a', 'alias', 'rwm')
 
         // should also override previous token
@@ -44,12 +44,12 @@ class KeygenCommandTest extends ReposiliteTestSpecification {
     @Test
     void 'should create token based on qualifier' () {
         assertTrue executeCommand('keygen org.panda-lang.reposilite reposilite rw')
-        assertEquals '*/org/panda-lang/reposilite', super.reposilite.getTokenService().getToken('reposilite').get().getPath()
+        assertEquals '*/org/panda-lang/reposilite', super.reposilite.getAuthService().getAuthenticator().getTokenService().getToken('reposilite').get().getPath()
     }
 
     @Test
     void 'should false if file is not available' () {
-        super.reposilite.getTokenService().createToken('/', 'alias', 'rwm')
+        super.reposilite.getAuthService().createToken('/', 'alias', 'rwm')
 
         executeOnLocked(new File(super.workingDirectory, 'tokens.dat'), {
             assertFalse executeCommand('keygen /a/b/c alias rw')

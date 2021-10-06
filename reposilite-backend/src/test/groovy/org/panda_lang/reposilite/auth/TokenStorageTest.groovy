@@ -32,8 +32,7 @@ final class TokenStorageTest {
 
     @Test
     void 'should convert old data file' () {
-        def workspace = workingDirectory.getAbsolutePath()
-        def tokenStorage = new TokenStorage(new TokenService(workspace), workspace)
+        def tokenStorage = new TokenStorage(new TokenService(workingDirectory), workingDirectory)
 
         FileUtils.overrideFile(new File(workingDirectory, 'tokens.yml'), 'tokens: []')
         tokenStorage.loadTokens()

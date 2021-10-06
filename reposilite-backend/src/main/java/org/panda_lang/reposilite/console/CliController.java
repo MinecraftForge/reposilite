@@ -22,7 +22,7 @@ import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteContextFactory;
 import org.panda_lang.reposilite.ReposiliteExecutor;
 import org.panda_lang.reposilite.ReposiliteWriter;
-import org.panda_lang.reposilite.auth.Authenticator;
+import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Result;
@@ -35,18 +35,18 @@ public final class CliController implements Consumer<WsConfig> {
 
     private final ReposiliteContextFactory contextFactory;
     private final ReposiliteExecutor reposiliteExecutor;
-    private final Authenticator authenticator;
+    private final AuthService auth;
     private final Console console;
 
     public CliController(
             ReposiliteContextFactory contextFactory,
             ReposiliteExecutor reposiliteExecutor,
-            Authenticator authenticator,
+            AuthService auth,
             Console console) {
 
         this.contextFactory = contextFactory;
         this.reposiliteExecutor = reposiliteExecutor;
-        this.authenticator = authenticator;
+        this.auth = auth;
         this.console = console;
     }
 
@@ -64,7 +64,7 @@ public final class CliController implements Consumer<WsConfig> {
             }
 
             String credentials = StringUtils.replaceFirst(authMessage, AUTHORIZATION_PREFIX, "");
-            Result<Session, String> auth = authenticator.authByCredentials(credentials);
+            Result<Session, String> auth = this.auth.authByCredentials(credentials);
 
             if (!auth.isOk() || !auth.get().isManager()) {
                 Reposilite.getLogger().info("CLI | Unauthorized CLI access request from " + context.address());

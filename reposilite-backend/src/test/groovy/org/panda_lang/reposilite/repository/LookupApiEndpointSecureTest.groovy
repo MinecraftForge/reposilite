@@ -114,7 +114,7 @@ class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification
         StringBuilder buf = new StringBuilder()
         for (Permission perm : perms)
             buf.append(perm.name)
-        return super.reposilite.tokenService.createToken(path, 'secret', buf.toString())
+        return super.reposilite.getAuthService().createToken(path, 'secret', buf.toString())
     }
 
     private static HttpResponse shouldReturn200(String uri, Pair<String, Token> token) {

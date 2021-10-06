@@ -42,7 +42,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @BeforeEach
     void configure() {
-        super.reposilite.getTokenService().createToken('/releases/auth/test', 'authtest', 'rwm', 'secure')
+        super.reposilite.getAuthService().createToken('/releases/auth/test', 'authtest', 'rwm', 'secure')
     }
 
     @Test
@@ -50,7 +50,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
         def deployService = new DeployService(
                 false,
                 false,
-                reposilite.getAuthenticator(),
+                reposilite.getAuthService(),
                 reposilite.getRepositoryService(),
                 reposilite.getMetadataService())
 

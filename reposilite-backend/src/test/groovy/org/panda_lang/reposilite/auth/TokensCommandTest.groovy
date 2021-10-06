@@ -27,9 +27,9 @@ class TokensCommandTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should list all tokens' () {
-        def tokenService = super.reposilite.getTokenService()
-        tokenService.createToken('/a', 'a', 'r')
-        tokenService.createToken('/b', 'b', 'r')
+        def authService = super.reposilite.getAuthService()
+        authService.createToken('/a', 'a', 'r')
+        authService.createToken('/b', 'b', 'r')
 
         assertTrue executeCommand('tokens')
     }

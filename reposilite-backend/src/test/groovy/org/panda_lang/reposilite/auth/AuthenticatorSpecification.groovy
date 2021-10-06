@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.panda_lang.reposilite
+package org.panda_lang.reposilite.auth
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.BeforeAll
@@ -37,15 +37,15 @@ class AuthenticatorSpecification {
             new FailureService(),
     )
 
-    static final TokenService TOKEN_SERVICE = new TokenService('.')
+    static final File WORK_DIR = new File('.')
     static final Token AUTH_TOKEN = new Token('/auth/test', 'alias', 'rw', TokenService.B_CRYPT_TOKENS_ENCODER.encode('secret'))
     static final String BASIC = 'Basic ' + Base64.getEncoder().encodeToString('alias:secret'.getBytes())
 
-    static final Authenticator AUTHENTICATOR = new Authenticator(REPOSITORY_SERVICE, TOKEN_SERVICE)
+    static final Authenticator AUTHENTICATOR = new Authenticator(WORK_DIR, REPOSITORY_SERVICE)
 
     @BeforeAll
     static void generateTokens() {
-        TOKEN_SERVICE.addToken(AUTH_TOKEN)
+        AUTHENTICATOR.getTokenService().addToken(AUTH_TOKEN)
     }
 
 }

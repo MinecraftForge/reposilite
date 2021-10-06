@@ -27,14 +27,11 @@ import java.io.File;
 import java.util.function.Supplier;
 
 public final class FrontendProvider {
-
-    private final Formatter formatter;
     private final Lazy<String> index;
     private final Lazy<String> app;
     private final Lazy<String> missing;
 
-    private FrontendProvider(Formatter formatter, Supplier<String> index, Supplier<String> app, Supplier<String> missing) {
-        this.formatter = formatter;
+    private FrontendProvider(Supplier<String> index, Supplier<String> app, Supplier<String> missing) {
         this.index = new Lazy<>(index);
         this.app = new Lazy<>(app);
         this.missing = new Lazy<>(() -> {
@@ -66,7 +63,6 @@ public final class FrontendProvider {
                 .register("{{REPOSILITE.ACCENT_COLOR}}", configuration.accentColor);
 
         return new FrontendProvider(
-                formatter,
                 () -> formatter.format(FilesUtils.getResource("/static/index.html", workingDirectory)),
                 () -> formatter.format(FilesUtils.getResource("/static/js/app.js", workingDirectory)),
                 () -> {

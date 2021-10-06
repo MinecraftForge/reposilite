@@ -18,6 +18,7 @@ package org.panda_lang.reposilite.auth;
 
 import java.io.Serializable;
 
+@SuppressWarnings("serial")
 public final class Token implements Serializable {
 
     private String alias;

@@ -15,6 +15,7 @@
  */
 
 import Vue from 'vue'
+import orDefault from './default'
 
 export default {
   methods: {
@@ -98,7 +99,7 @@ export default {
     baseUrl () {
       return process.env.NODE_ENV === 'production'
         ? Vue.prototype.$reposilite.basePath
-        : 'http://localhost:80/'
+        : orDefault(process.env.BACKEND_URL, 'http://localhost:80/')
     }
   }
 }

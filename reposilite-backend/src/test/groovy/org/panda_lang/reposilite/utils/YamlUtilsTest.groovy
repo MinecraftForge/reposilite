@@ -17,7 +17,11 @@
 package org.panda_lang.reposilite.utils
 
 import groovy.transform.CompileStatic
+
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+
+import static org.junit.jupiter.api.Assertions.assertEquals
 
 @CompileStatic
 class YamlUtilsTest {
@@ -25,4 +29,33 @@ class YamlUtilsTest {
     @TempDir
     protected File workingDirectory
 
+    @Test
+    void getRepositories() {
+        def data = FilesUtils.getResource("/private_test.yml", null)
+        def expected = new PackagePrivate("key!", "value!")
+        def actual = YamlUtils.load(data, PackagePrivate.class)
+        assertEquals expected.key, actual.key
+        assertEquals expected.value, actual.value
+    }
+
+
+
+    static class PackagePrivate {
+        String key
+        String value
+
+        PackagePrivate() {}
+
+        PackagePrivate(String key, String value) {
+            this.key = key
+            this.value = value
+        }
+
+        public void setKey(String value) {
+            this.key = value
+        }
+        public void setValue(String value) {
+            this.value = value
+        }
+    }
 }

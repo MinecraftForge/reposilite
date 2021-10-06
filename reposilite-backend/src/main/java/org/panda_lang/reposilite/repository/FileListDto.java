@@ -19,6 +19,7 @@ package org.panda_lang.reposilite.repository;
 import java.io.Serializable;
 import java.util.List;
 
+@SuppressWarnings("serial")
 final class FileListDto implements Serializable {
 
     private final List<? extends FileDetailsDto> files;

@@ -46,7 +46,7 @@ class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return list of all authenticated repositories' () {
-        def secret = super.reposilite.getTokenService().createToken('/private', 'secret', 'rwm')
+        def secret = super.reposilite.getAuthService().createToken('/private', 'secret', 'rwm')
 
         def response = getAuthenticated('/api', 'secret', secret.getKey())
         assertEquals HttpStatus.SC_OK, response.getStatusCode()

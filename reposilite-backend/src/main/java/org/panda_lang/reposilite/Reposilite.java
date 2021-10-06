@@ -17,9 +17,6 @@
 package org.panda_lang.reposilite;
 
 import org.panda_lang.reposilite.auth.AuthService;
-import org.panda_lang.reposilite.auth.AuthenticationConfiguration;
-import org.panda_lang.reposilite.auth.Authenticator;
-import org.panda_lang.reposilite.auth.TokenService;
 import org.panda_lang.reposilite.config.Configuration;
 import org.panda_lang.reposilite.config.ConfigurationLoader;
 import org.panda_lang.reposilite.console.Console;
@@ -56,7 +53,6 @@ public final class Reposilite {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("Reposilite");
 
-    private final boolean servlet;
     private final AtomicBoolean alive;
     private final ExecutorService ioService;
     private final ScheduledExecutorService retryService;
@@ -67,10 +63,8 @@ public final class Reposilite {
     private final ReposiliteContextFactory contextFactory;
     private final ReposiliteExecutor executor;
     private final FailureService failureService;
-    private final Authenticator authenticator;
     private final RepositoryAuthenticator repositoryAuthenticator;
     private final AuthService authService;
-    private final TokenService tokenService;
     private final StatsService statsService;
     private final RepositoryService repositoryService;
     private final MetadataService metadataService;
@@ -83,11 +77,10 @@ public final class Reposilite {
     private final Thread shutdownHook;
     private long uptime;
 
-    Reposilite(String configurationFile, String workingDirectory, boolean servlet, boolean testEnv) {
+    Reposilite(String configurationFile, String workingDirectory, boolean testEnv) {
         ValidationUtils.notNull(configurationFile, "Configuration file cannot be null. To use default configuration file, provide empty string");
         ValidationUtils.notNull(workingDirectory, "Working directory cannot be null. To use default working directory, provide empty string");
 
-        this.servlet = servlet;
         this.alive = new AtomicBoolean(false);
         this.ioService = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 1, TimeUnit.SECONDS, new SynchronousQueue<>());
         this.retryService = Executors.newSingleThreadScheduledExecutor();
@@ -99,30 +92,19 @@ public final class Reposilite {
         this.contextFactory = new ReposiliteContextFactory(configuration.forwardedIp);
         this.failureService = new FailureService();
         this.executor = new ReposiliteExecutor(testEnvEnabled, failureService);
-        this.tokenService = new TokenService(workingDirectory);
         this.statsService = new StatsService(workingDirectory, failureService, ioService, retryService);
         this.repositoryService = new RepositoryService(workingDirectory, configuration.diskQuota, ioService, retryService, failureService);
         this.metadataService = new MetadataService(failureService);
 
-        this.authenticator = new Authenticator(repositoryService, tokenService);
-        this.repositoryAuthenticator = new RepositoryAuthenticator(configuration.rewritePathsEnabled, authenticator, repositoryService);
-        this.authService = new AuthService(authenticator);
-        this.deployService = new DeployService(configuration.deployEnabled, configuration.rewritePathsEnabled, authenticator, repositoryService, metadataService);
-        this.lookupService = new LookupService(authenticator, repositoryAuthenticator, metadataService, repositoryService, ioService, failureService, configuration.proxiedStorageRepo);
+        this.authService = new AuthService(this.workingDirectory, repositoryService);
+        this.repositoryAuthenticator = new RepositoryAuthenticator(configuration.rewritePathsEnabled, this.authService, repositoryService);
+        this.deployService = new DeployService(configuration.deployEnabled, configuration.rewritePathsEnabled, this.authService, repositoryService, metadataService);
+        this.lookupService = new LookupService(repositoryAuthenticator, metadataService, repositoryService, configuration.proxiedStorageRepo);
         this.proxyService = new ProxyService(configuration.storeProxied, configuration.proxiedStorageRepo, configuration.proxyPrivate, configuration.proxyConnectTimeout, configuration.proxyReadTimeout, configuration.rewritePathsEnabled, configuration.proxied, ioService, failureService, repositoryService);
         this.frontend = FrontendProvider.load(configuration, this.workingDirectory);
-        this.reactiveHttpServer = new ReposiliteHttpServer(this, servlet);
+        this.reactiveHttpServer = new ReposiliteHttpServer(this);
         this.console = new Console(System.in, failureService);
         this.shutdownHook = new Thread(RunUtils.ofChecked(failureService, this::shutdown));
-    }
-
-    public ReposiliteConfiguration[] configurations() {
-        return new ReposiliteConfiguration[] {
-                new AuthenticationConfiguration(),
-                new ConsoleConfiguration(),
-                new MetadataConfiguration(),
-                new StatsConfiguration()
-        };
     }
 
     public void launch() throws Exception {
@@ -145,17 +127,15 @@ public final class Reposilite {
         this.alive.set(true);
         Runtime.getRuntime().addShutdownHook(this.shutdownHook);
 
-        getLogger().info("--- Loading data");
-        tokenService.loadTokens();
-
         getLogger().info("");
         repositoryService.load(configuration);
         getLogger().info("");
 
         getLogger().info("--- Loading domain configurations");
-        for (ReposiliteConfiguration configuration : configurations()) {
-            configuration.configure(this);
-        }
+        this.authService.configure(this);
+        new ConsoleConfiguration().configure(this);
+        new MetadataConfiguration().configure(this);
+        new StatsConfiguration().configure(this);
     }
 
     public void start() throws Exception {
@@ -252,20 +232,12 @@ public final class Reposilite {
         return statsService;
     }
 
-    public TokenService getTokenService() {
-        return tokenService;
-    }
-
     public AuthService getAuthService() {
         return authService;
     }
 
     public RepositoryAuthenticator getRepositoryAuthenticator() {
         return repositoryAuthenticator;
-    }
-
-    public Authenticator getAuthenticator() {
-        return authenticator;
     }
 
     public Configuration getConfiguration() {

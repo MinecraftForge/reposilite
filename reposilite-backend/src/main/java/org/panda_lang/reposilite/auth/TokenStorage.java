@@ -26,14 +26,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
 
-public final class TokenStorage {
+final class TokenStorage {
 
     private final TokenService tokenService;
     private final File tokensFile;
 
-    public TokenStorage(TokenService tokenService, String workingDirectory) {
+    TokenStorage(TokenService tokenService, File workingDirectory) {
         this.tokenService = tokenService;
         this.tokensFile = new File(workingDirectory, ReposiliteConstants.TOKENS_FILE_NAME);
     }
@@ -58,7 +57,7 @@ public final class TokenStorage {
 
         TokenCollection tokenCollection = YamlUtils.load(tokensFile, TokenCollection.class);
 
-        for (Token token : tokenCollection.getTokens()) {
+        for (Token token : tokenCollection.tokens) {
             // Update missing default permissions of old tokens
             // ~ https://github.com/dzikoysk/reposilite/issues/233
             token.setPermissions(Option.of(token.getPermissions()).orElseGet(Permission.toString(Permission.getDefaultPermissions())));
@@ -70,14 +69,13 @@ public final class TokenStorage {
 
     public void saveTokens() throws IOException {
         TokenCollection tokenCollection = new TokenCollection();
-        tokenCollection.setTokens(new ArrayList<>());
 
         for (Token token : tokenService.getTokens()) {
-            tokenCollection.getTokens().add(token);
+            tokenCollection.tokens.add(token);
         }
 
         YamlUtils.save(tokensFile, tokenCollection);
-        Reposilite.getLogger().info("Stored tokens: " + tokenCollection.getTokens().size());
+        Reposilite.getLogger().info("Stored tokens: " + tokenCollection.tokens.size());
     }
 
 }
