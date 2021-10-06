@@ -1,11 +1,14 @@
 @Library('forge-shared-library')_
 
 pipeline {
+    aggent any
+    /* TODO: Custom docker image that is just java + docker + docker-compose?
     agent {
         docker {
             image 'gradle:jdk8'
         }
     }
+    */
     environment {
         DISCORD_WEBHOOK = credentials('forge-discord-jenkins-webhook')
         DISCORD_PREFIX = "Job: Reposilite Branch: ${BRANCH_NAME} Build: #${BUILD_NUMBER}"
