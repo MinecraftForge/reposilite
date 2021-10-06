@@ -53,28 +53,12 @@ public final class ConfigurationLoader {
 
         Configuration configuration = configurationFile.exists()
             ? cdn.load(configurationFile, Configuration.class)
-            : createConfiguration(configurationFile);
+            : new Configuration();
 
         verifyBasePath(configuration);
         verifyProxied(configuration);
         FileUtils.overrideFile(configurationFile, cdn.render(configuration));
         loadProperties(configuration);
-
-        return configuration;
-    }
-
-    private static Configuration createConfiguration(File configurationFile) throws Exception {
-        File legacyConfiguration = new File(configurationFile.getAbsolutePath().replace(".cdn", ".yml"));
-
-        if (!legacyConfiguration.exists()) {
-            Reposilite.getLogger().info("Generating default configuration file.");
-            return new Configuration();
-        }
-
-        Reposilite.getLogger().info("Legacy configuration file has been found");
-        Configuration configuration = CdnFactory.createYamlLike().load(legacyConfiguration, Configuration.class);
-        Reposilite.getLogger().info("YAML configuration has been converted to CDN format");
-        FileUtils.delete(legacyConfiguration);
 
         return configuration;
     }

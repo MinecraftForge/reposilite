@@ -22,6 +22,7 @@ import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteConfiguration;
 import org.panda_lang.reposilite.config.Configuration;
 import org.panda_lang.reposilite.console.Console;
+import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.repository.RepositoryService;
 import org.panda_lang.utilities.commons.collection.Pair;
 import org.panda_lang.utilities.commons.function.Result;
@@ -40,7 +41,16 @@ public final class AuthService implements ReposiliteConfiguration {
         this.auth = new Authenticator(workingDirectory, repositoryService);
     }
 
-    public void register(Configuration configuration, Javalin javalin) {
+    public void register(Configuration config, Javalin javalin) {
+        if (config.apiEnabled) {
+            javalin.get("/api/auth", ctx -> {
+                authByHeader(ctx.headerMap())
+                .map(session -> new AuthDto(session.getToken().getPath(), session.getToken().getPermissions(), session.getRepositoryNames()))
+                .mapErr(error -> new ErrorDto(HttpStatus.SC_UNAUTHORIZED, error))
+                .peek(ctx::json)
+                .onError(error -> ctx.status(error.getStatus()).json(error));
+            });
+        }
         javalin.after("/*", ctx -> {
             if (ctx.status() == HttpStatus.SC_UNAUTHORIZED) {
                 ctx.header("www-authenticate", "Basic realm=\"Reposilite\", charset=\"UTF-8\"");

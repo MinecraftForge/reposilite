@@ -78,18 +78,6 @@ class ConfigurationLoaderTest {
     }
 
     @Test
-    void 'should convert legacy config' () {
-        def legacyConfig = new File(workingDirectory, "config.yml")
-        FileUtils.overrideFile(legacyConfig, "port: 7")
-        def config = new File(legacyConfig.getAbsolutePath().replace(".yml", ".cdn"))
-
-        def configuration = ConfigurationLoader.tryLoad(config.getAbsolutePath(), workingDirectory.getAbsolutePath())
-        assertEquals 7, configuration.port
-        assertTrue config.exists()
-        assertFalse legacyConfig.exists()
-    }
-
-    @Test
     void 'should verify proxied' () {
         def config = new File(workingDirectory, "config.cdn")
         FileUtils.overrideFile(config, Joiner.on("\n").join(
