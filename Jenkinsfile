@@ -1,7 +1,7 @@
 @Library('forge-shared-library')_
 
 pipeline {
-    aggent any
+    agent any
     /* TODO: Custom docker image that is just java + docker + docker-compose?
     agent {
         docker {
