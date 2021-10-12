@@ -20,64 +20,71 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
+import org.panda_lang.reposilite.auth.IAuthManager;
+import org.panda_lang.reposilite.auth.Permission;
+import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataService;
 import org.panda_lang.reposilite.metadata.MetadataUtils;
-import org.panda_lang.reposilite.utils.ArrayUtils;
-import org.panda_lang.utilities.commons.collection.Pair;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.Objects;
-import java.util.Optional;
 
-public final class LookupService {
-
-    private final RepositoryAuthenticator repositoryAuthenticator;
+final class LookupService {
     private final MetadataService metadataService;
-    private final RepositoryService repositoryService;
-    private final String proxiedStorageRepo;
+    private final IRepositoryManager repos;
+    private final IAuthManager auth;
+    private final ProxyService proxy;
 
-    public LookupService(
-            RepositoryAuthenticator repositoryAuthenticator,
+    LookupService(
             MetadataService metadataService,
-            RepositoryService repositoryService,
-            String proxiedStorageRepo) {
-
-        this.repositoryAuthenticator = repositoryAuthenticator;
+            IRepositoryManager repos,
+            IAuthManager auth,
+            ProxyService proxy) {
         this.metadataService = metadataService;
-        this.repositoryService = repositoryService;
-        this.proxiedStorageRepo = proxiedStorageRepo;
+        this.repos = repos;
+        this.auth = auth;
+        this.proxy = proxy;
     }
 
-    Result<LookupResponse, ErrorDto> findLocal(ReposiliteContext context) {
+    Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context) {
         String uri = context.uri();
-        Result<Pair<String[], Repository>, ErrorDto> result = this.repositoryAuthenticator.authDefaultRepository(context.headers(), uri);
 
-        if (result.isErr()) {
-            // Maven requests maven-metadata.xml file during deploy for snapshot releases without specifying credentials
-            // https://github.com/dzikoysk/reposilite/issues/184
-            if (uri.contains("-SNAPSHOT") && uri.endsWith("maven-metadata.xml")) {
-                return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, result.getError().getMessage());
-            }
+        if ("/".equals(uri))
+            return ResponseUtils.error(HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Unsupported request");
 
-            return Result.error(result.getError());
+        IRepository repo = context.repo();
+        if (repo == null)
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.normalized());
+
+        if (repo.isHidden()) {
+            Result<Session, String> auth = this.auth.getSession(context.headers(), uri);
+            if (auth.isErr() || !auth.get().hasPermissionTo('/' + uri) || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER))
+                return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, "Unauthorized request");
         }
 
-        String[] path = result.get().getKey();
-        // remove repository name from path
-        String[] requestPath = Arrays.copyOfRange(path, 1, path.length);
+        String[] requestPath = context.filepath().split("/");
 
         // discard invalid requests (less than 'group/(artifact OR metadata)')
+        /*
+         * TODO: Don't support meta for non-artifacts
+         * https://maven.apache.org/ref/3.3.3/maven-repository-metadata/
+         * This specifies three locations for metadata:
+         *   1) Unversioned artifact: /group/artifact/maven-metadata.xml
+         *     This list all versions for this artifact
+         *   2) Snapshot artifact: /group/artifact/version-SNAPSHOT/maven-metadata.xml
+         *     Lists all versions of the snapshot,
+         *   3) Maven Plugin Group: /goup/maven-metadata.xml
+         *     This I dont think we can generate... So request from the proxy, or 404
+         */
         if (requestPath.length < 2) {
             return ResponseUtils.error(HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Missing artifact identifier");
         }
 
-        Repository repository = result.get().getValue();
-        String requestedFileName = Objects.requireNonNull(ArrayUtils.getLast(requestPath));
+        String requestedFileName = requestPath[requestPath.length - 1];
 
+        /*
         Optional<Artifact> testArtifact = repository.find(requestPath);
         // This doesn't work for requesting /latest in proxied files, but I don't give a shit...
         if (!testArtifact.isPresent() && this.proxiedStorageRepo != null && !this.proxiedStorageRepo.isEmpty()) {
@@ -89,19 +96,21 @@ public final class LookupService {
                 }
             }
         }
+        */
 
-        if (requestedFileName.equals("maven-metadata.xml")) {
-            return metadataService
-                    .generateMetadata(repository, requestPath)
-                    .mapErr(error -> new ErrorDto(HttpStatus.SC_USE_PROXY, error))
-                    .map(metadataContent -> new LookupResponse("text/xml", metadataContent));
+        if (requestPath.length > 3 && requestedFileName.equals("maven-metadata.xml")) {
+            Result<String, String> meta = metadataService.generateMetadata(repo, requestPath);
+            if (meta.isErr())
+                return findProxy(context);
+            else
+                return Result.ok(new LookupResponse("text/xml", meta.get()));
         }
 
         // resolve requests for latest version of artifact
         if (requestedFileName.equalsIgnoreCase("latest")) {
-            File requestDirectory = repository.getFile(requestPath).getParentFile();
+            File requestDirectory = repo.getFile(requestPath).getParentFile();
             File[] versions = MetadataUtils.toSortedVersions(requestDirectory);
-            File version = ArrayUtils.getFirst(versions);
+            File version = versions == null || versions.length == 0 ? null : versions[0];
 
             if (version == null) {
                 return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Latest version not found");
@@ -110,26 +119,28 @@ public final class LookupService {
             return Result.ok(new LookupResponse("text/plain", version.getName()));
         }
 
+        /* Why the fuck does he do this? Maven clients should request the metadata and then request the specific version they want. This just interfears with that.
         // resolve snapshot requests
         if (requestedFileName.contains("-SNAPSHOT")) {
-            repositoryService.resolveSnapshot(repository, requestPath);
+            repo.resolveSnapshot(repo, requestPath);
             // update requested file name in case of snapshot request
             requestedFileName = requestPath[requestPath.length - 1];
         }
+        */
 
-        File repositoryFile = repository.getFile(requestPath);
+        File file = repo.getFile(requestPath);
 
-        if (repositoryFile.exists() && repositoryFile.isDirectory()) {
+        if (!file.exists()) {
+            if ((requestPath.length == 3 && !"maven-metadata.xml".equals(requestPath[2])) && requestPath.length < 4)
+                return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Invalid artifact path");
+            else
+                return findProxy(context);
+        }
+
+        if (file.isDirectory()) {
             return ResponseUtils.error(HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Directory access");
         }
 
-        Optional<Artifact> artifact = repository.find(requestPath);
-
-        if (!artifact.isPresent()) {
-            return ResponseUtils.error(HttpStatus.SC_USE_PROXY, "Artifact " + requestedFileName + " not found");
-        }
-
-        File file = artifact.get().getFile(requestedFileName);
         FileDetailsDto fileDetails = FileDetailsDto.of(file);
 
         if (!context.method().equals("HEAD")) {
@@ -138,6 +149,19 @@ public final class LookupService {
 
         Reposilite.getLogger().debug("RESOLVED " + file.getPath() + "; mime: " + fileDetails.getContentType() + "; size: " + file.length());
         return Result.ok(new LookupResponse(fileDetails));
+    }
+
+    private Result<LookupResponse, ErrorDto> findProxy(ReposiliteContext context) {
+
+        /*
+        private void handleProxied(Context ctx, ReposiliteContext context, Result<CompletableFuture<Result<LookupResponse, ErrorDto>>, ErrorDto> response) {
+            response
+                .map(task -> task.thenAccept(result -> handleResult(ctx, context, result)))
+                .peek(ctx::result)
+                .onError(error -> handleError(ctx, error));
+        }
+        */
+        return proxy.findProxied(context);
     }
 
 }

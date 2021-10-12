@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package org.panda_lang.reposilite.metadata
+package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 import org.panda_lang.reposilite.ReposiliteTestSpecification
+import org.panda_lang.reposilite.metadata.MetadataService
 import org.panda_lang.utilities.commons.function.Result
 
 import static org.junit.jupiter.api.Assertions.assertEquals
@@ -26,7 +27,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue
 
 @CompileStatic
 final class MetadataServiceTest extends ReposiliteTestSpecification {
-
     @Test
     void 'should return bad request' () {
         def result = generate("org", "panda-lang", "reposilite-test", "1.0.0", "reposilite-test-1.0.0.jar", "reposilite-test-1.0.0.jar")
@@ -78,19 +78,19 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should clear cache' () {
-        String[] metadata = [ "org", "panda-lang", "reposilite-test", "maven-metadata.xml" ]
-        generate(metadata)
+        String[] path = [ "org", "panda-lang", "reposilite-test", "maven-metadata.xml" ]
+        generate(path)
 
-        MetadataService metadataService = super.reposilite.getMetadataService()
+        def metadataService = metadata()
         assertEquals 1, metadataService.getCacheSize()
 
-        metadataService.clearMetadata(super.reposilite.getRepositoryService().getRepository("releases").getFile(metadata))
+        metadataService.clearMetadata(super.reposilite.getRepos().getRepo("releases").getFile(path))
         assertEquals 0, metadataService.getCacheSize()
     }
 
     @Test
     void 'should purge cache' () {
-        def metadataService = super.reposilite.getMetadataService()
+        def metadataService = metadata()
         assertEquals 0, metadataService.purgeCache()
         assertEquals 0, metadataService.getCacheSize()
 
@@ -101,7 +101,7 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should return current cache size' () {
-        def metadataService = super.reposilite.getMetadataService()
+        def metadataService = metadata()
         assertEquals 0, metadataService.getCacheSize()
 
         generateAll()
@@ -116,9 +116,15 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
         generate "org", "panda-lang", "reposilite-test", "1.0.1-SNAPSHOT", "maven-metadata.xml"
     }
 
+
+    private MetadataService metadata() {
+        return ((RepositoryManager)super.reposilite.repos).@metadataService
+    }
+
     private Result<String, String> generate(String... path) {
-        def releases = super.reposilite.getRepositoryService().getRepository("releases")
-        return super.reposilite.getMetadataService().generateMetadata(releases, path)
+        def manager = (RepositoryManager)super.reposilite.repos
+        def releases = manager.getRepo("releases")
+        return manager.@metadataService.generateMetadata(releases, path)
     }
 
 }

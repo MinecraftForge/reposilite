@@ -18,6 +18,7 @@ package org.panda_lang.reposilite.auth;
 
 import java.io.Serializable;
 
+//TODO: Api-ify this
 @SuppressWarnings("serial")
 public final class Token implements Serializable {
 
@@ -26,7 +27,7 @@ public final class Token implements Serializable {
     private String permissions;
     private String token;
 
-    public Token(String path, String alias, String permissions, String token) {
+    Token(String path, String alias, String permissions, String token) {
         this.alias = alias;
         this.path = path;
         this.permissions = permissions;

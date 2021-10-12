@@ -16,49 +16,42 @@
 
 package org.panda_lang.reposilite.auth;
 
-import org.panda_lang.utilities.commons.collection.Pair;
+import org.panda_lang.reposilite.Reposilite;
+import org.panda_lang.reposilite.ReposiliteConstants;
+import org.panda_lang.reposilite.utils.FilesUtils;
+import org.panda_lang.reposilite.utils.YamlUtils;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.SecureRandom;
-import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 final class TokenService {
-
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     public static final BCryptPasswordEncoder B_CRYPT_TOKENS_ENCODER = new BCryptPasswordEncoder();
 
     private final Map<String, Token> tokens = new HashMap<>();
     private final TokenStorage database;
 
-    public TokenService(File workingDirectory) {
-        this.database = new TokenStorage(this, workingDirectory);
+    TokenService(File dir) {
+        this.database = new TokenStorage(this, dir);
     }
 
-    public void loadTokens() throws IOException {
+    void loadTokens() throws IOException {
         this.database.loadTokens();
     }
 
-    public void saveTokens() throws IOException {
+    void saveTokens() throws IOException {
         this.database.saveTokens();
     }
 
-    public Pair<String, Token> createToken(String path, String alias, String permissions) {
-        byte[] randomBytes = new byte[48];
-        SECURE_RANDOM.nextBytes(randomBytes);
-        return createToken(path, alias, permissions, Base64.getEncoder().encodeToString(randomBytes));
-    }
-
-    public Pair<String, Token> createToken(String path, String alias, String permissions, String token) {
-        String encodedToken = B_CRYPT_TOKENS_ENCODER.encode(token);
-        return new Pair<>(token, addToken(new Token(path, alias, permissions, encodedToken)));
+    Token createToken(String path, String alias, String permissions, String password) {
+        String encoded = B_CRYPT_TOKENS_ENCODER.encode(password);
+        return addToken(new Token(path, alias, permissions, encoded));
     }
 
     public Result<Token, String> updateToken(String alias, Consumer<Token> tokenConsumer) {
@@ -77,25 +70,63 @@ final class TokenService {
                 .orElseGet(() -> Result.error("Cannot find token associated with '" + alias + "' alias"));
     }
 
-    public Token addToken(Token token) {
+    Token addToken(Token token) {
         this.tokens.put(token.getAlias(), token);
         return token;
     }
 
-    Option<Token> deleteToken(String alias) {
-        return Option.of(tokens.remove(alias));
+    Token deleteToken(String alias) {
+        return tokens.remove(alias);
     }
 
     Option<Token> getToken(String alias) {
         return Option.of(tokens.get(alias));
     }
 
-    public int count() {
-        return tokens.size();
-    }
-
     Collection<Token> getTokens() {
         return tokens.values();
     }
 
+    private final class TokenStorage {
+        private final TokenService tokenService;
+        private final File tokensFile;
+
+        private TokenStorage(TokenService tokenService, File workingDirectory) {
+            this.tokenService = tokenService;
+            this.tokensFile = new File(workingDirectory, ReposiliteConstants.TOKENS_FILE_NAME);
+        }
+
+        private void loadTokens() throws IOException {
+            if (!tokensFile.exists()) {
+                Reposilite.getLogger().info("Generating tokens data file...");
+                FilesUtils.copyResource("/" + ReposiliteConstants.TOKENS_FILE_NAME, tokensFile);
+                Reposilite.getLogger().info("Empty tokens file has been generated");
+            } else {
+                Reposilite.getLogger().info("Using an existing tokens data file");
+            }
+
+            TokenCollection tokenCollection = YamlUtils.load(tokensFile, TokenCollection.class);
+
+            for (Token token : tokenCollection.tokens) {
+                // Update missing default permissions of old tokens
+                // ~ https://github.com/dzikoysk/reposilite/issues/233
+                token.setPermissions(Option.of(token.getPermissions()).orElseGet(Permission.toString(Permission.getDefaultPermissions())));
+                tokenService.addToken(token);
+            }
+
+            Reposilite.getLogger().info("Tokens: " + tokenService.getTokens().size());
+        }
+
+        private void saveTokens() throws IOException {
+            TokenCollection tokenCollection = new TokenCollection();
+
+            for (Token token : tokenService.getTokens()) {
+                tokenCollection.tokens.add(token);
+            }
+
+            YamlUtils.save(tokensFile, tokenCollection);
+            Reposilite.getLogger().info("Stored tokens: " + tokenCollection.tokens.size());
+        }
+
+    }
 }

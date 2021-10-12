@@ -16,50 +16,92 @@
 
 package org.panda_lang.reposilite.repository;
 
-import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.utils.FilesUtils;
 
 import java.io.File;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class DiskQuota {
-
+final class DiskQuota implements IQuota {
+    private final DiskQuota parent;
     private final AtomicLong quota;
     private final AtomicLong usage;
+    private String toString = null;
 
-    DiskQuota(long quota, long usage) {
+    private DiskQuota(DiskQuota parent, long quota, long usage) {
+        this.parent = parent;
         this.quota = new AtomicLong(quota);
         this.usage = new AtomicLong(usage);
     }
 
     void allocate(long size) {
+        if (parent != null)
+            parent.allocate(size);
+        toString = null;
         usage.addAndGet(size);
     }
 
-    public boolean hasUsableSpace() {
-        return usage.get() < quota.get();
+    public boolean notFull() {
+        return (this.parent == null || this.parent.notFull()) && usage.get() < quota.get();
     }
 
+    @Override
     public long getUsage() {
         return usage.get();
     }
 
-    static DiskQuota ofPercentage(File workingDirectory, long usage, int percentage) {
-        return new DiskQuota(Math.round(workingDirectory.getUsableSpace() * (percentage / 100D)), usage);
+    @Override
+    public long getCapacity() {
+        return quota.get();
     }
 
-    static DiskQuota ofSize(long usage, String size) {
-        return new DiskQuota(FilesUtils.displaySizeToBytesCount(size), usage);
-    }
-
-    static DiskQuota of(File workingDirectory, String value) {
-        long usage = FileUtils.sizeOfDirectory(workingDirectory);
-
-        if (value.endsWith("%")) {
-            return ofPercentage(workingDirectory,  usage, Integer.parseInt(value.substring(0, value.length() - 1)));
+    @Override
+    public String toString() {
+        String ret = toString;
+        if (ret == null) {
+            ret = toString = FilesUtils.bytesToDisplay(getUsage()) + '/' + FilesUtils.bytesToDisplay(getCapacity());
         }
-
-        return ofSize(usage, value);
+        return ret;
     }
 
+    static DiskQuota none() {
+        return new DiskQuota(null, 0, 0);
+    }
+
+    static DiskQuota unlimited() {
+        return unlimited(null);
+    }
+
+    static DiskQuota unlimited(DiskQuota parent) {
+        return new DiskQuota(parent, Long.MAX_VALUE, 0);
+    }
+
+    static DiskQuota ofPercentage(File dir, String value) {
+        if (value.charAt(value.length() - 1) == '%')
+            value = value.substring(0, value.length() - 1);
+        long max = dir.getTotalSpace();
+        float percent = Float.parseFloat(value) / 100F;
+        return new DiskQuota(null, Math.round(max * percent), 0);
+    }
+
+    static DiskQuota ofPercentage(DiskQuota parent, String value) {
+        if (value.charAt(value.length() - 1) == '%')
+            value = value.substring(0, value.length() - 1);
+        float percent = Float.parseFloat(value) / 100F;
+        return new DiskQuota(parent, Math.round(parent.getCapacity() * percent), 0);
+    }
+
+    static DiskQuota of(String capacity) {
+        return of(FilesUtils.displayToBytes(capacity));
+    }
+
+    static DiskQuota of(long capacity) {
+        return of(null, capacity);
+    }
+
+    static DiskQuota of(DiskQuota parent, String capacity) {
+        return of(parent, FilesUtils.displayToBytes(capacity));
+    }
+    static DiskQuota of(DiskQuota parent, long capacity) {
+        return new DiskQuota(parent, capacity, 0);
+    }
 }

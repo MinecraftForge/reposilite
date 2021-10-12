@@ -18,83 +18,47 @@ package org.panda_lang.reposilite.repository;
 
 import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.Reposilite;
-import org.panda_lang.reposilite.config.Configuration;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 final class RepositoryStorage {
-
     private static final long RETRY_WRITE_TIME = 2000L;
 
-    private final Map<String, Repository> repositories = new LinkedHashMap<>(4);
+    private final IRepositoryManager manager;
+    private final ExecutorService executor;
+    private final ScheduledExecutorService scheduled;
 
-    private final File rootDirectory;
-    private final DiskQuota diskQuota;
-    private final ExecutorService ioService;
-    private final ScheduledExecutorService retryService;
-    private Repository primaryRepository;
-
-    RepositoryStorage(File rootDirectory, String diskQuota, ExecutorService ioService, ScheduledExecutorService retryService) {
-        this.rootDirectory = rootDirectory;
-        this.diskQuota = DiskQuota.of(getRootDirectory().getParentFile(), diskQuota);
-        this.ioService = ioService;
-        this.retryService = retryService;
+    RepositoryStorage(IRepositoryManager manager, ExecutorService executor, ScheduledExecutorService scheduled) {
+        this.manager = manager;
+        this.executor = executor;
+        this.scheduled = scheduled;
     }
 
-    void load(Configuration configuration) {
+    void load() {
         Reposilite.getLogger().info("--- Loading repositories");
 
-        if (rootDirectory.mkdirs()) {
-            Reposilite.getLogger().info("Default repository directory has been created");
-        }
-        else {
-            Reposilite.getLogger().info("Using an existing repository directory");
+        for (IRepository repo : manager.getRepos()) {
+            repo.load();
+            Reposilite.getLogger().info("+ " + repo.getName() + (repo.isHidden() ? " (hidden)" : "") + " " + repo.getQuota());
         }
 
-        for (String repositoryName : configuration.repositories) {
-            boolean hidden = repositoryName.startsWith(".");
-            boolean primary = primaryRepository == null;
-
-            if (hidden) {
-                repositoryName = repositoryName.substring(1);
-            }
-
-            File repositoryDirectory = new File(rootDirectory, repositoryName);
-
-            if (repositoryDirectory.mkdirs()) {
-                Reposilite.getLogger().info("+ Repository '" + repositoryName + "' has been created");
-            }
-
-            Repository repository = new Repository(rootDirectory, repositoryName, hidden);
-            repositories.put(repository.getName(), repository);
-
-            if (primary) {
-                this.primaryRepository = repository;
-            }
-
-            Reposilite.getLogger().info("+ " + repositoryDirectory.getName() + (hidden ? " (hidden)" : "") + (primary ? " (primary)" : ""));
-        }
-
-        Reposilite.getLogger().info(repositories.size() + " repositories have been found");
+        Reposilite.getLogger().info(manager.getRepos().size() + " repositories have been found");
     }
 
-    CompletableFuture<File> storeFile(InputStream source, File targetFile) throws Exception {
-        return storeFile(new CompletableFuture<>(), source, targetFile);
+    CompletableFuture<File> storeFile(InputStream source, IRepository repo, String path) throws Exception {
+        return storeFile(new CompletableFuture<>(), source, repo, path);
     }
 
-    private CompletableFuture<File> storeFile(CompletableFuture<File> task, InputStream source, File targetFile) throws IOException {
+    private CompletableFuture<File> storeFile(CompletableFuture<File> task, InputStream source, IRepository repo, String path) throws IOException {
+        File targetFile = repo.getFile(path);
+
         if (targetFile.isDirectory()) {
             throw new IOException("Cannot lock directory");
         }
@@ -102,9 +66,9 @@ final class RepositoryStorage {
         File lockedFile = new File(targetFile.getAbsolutePath() + ".lock");
 
         if (lockedFile.exists()) {
-            retryService.schedule(() -> {
-                ioService.submit(() -> {
-                    storeFile(task, source, targetFile);
+            scheduled.schedule(() -> {
+                executor.submit(() -> {
+                    storeFile(task, source, repo, path);
                     return null;
                 });
             }, RETRY_WRITE_TIME, TimeUnit.MILLISECONDS);
@@ -119,35 +83,11 @@ final class RepositoryStorage {
         }
 
         Files.copy(source, lockedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        diskQuota.allocate(lockedFile.length());
+        //TODO: This needs to subtract the length of the overwritten file. So that repeated deploys don't eat the quota
+        ((DiskQuota)repo.getQuota()).allocate(lockedFile.length());
         Files.move(lockedFile.toPath(), targetFile.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
 
         task.complete(targetFile);
         return task;
     }
-
-    File getFile(String path) {
-        return new File(rootDirectory, path);
-    }
-
-    Repository getRepository(String repositoryName) {
-        return repositories.get(repositoryName);
-    }
-
-    List<Repository> getRepositories() {
-        return new ArrayList<>(repositories.values());
-    }
-
-    Repository getPrimaryRepository() {
-        return primaryRepository;
-    }
-
-    DiskQuota getDiskQuota() {
-        return diskQuota;
-    }
-
-    File getRootDirectory() {
-        return rootDirectory;
-    }
-
 }

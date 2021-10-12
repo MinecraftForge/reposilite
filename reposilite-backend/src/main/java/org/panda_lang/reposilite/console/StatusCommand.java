@@ -18,7 +18,6 @@ package org.panda_lang.reposilite.console;
 
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteConstants;
-import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.reposilite.utils.TimeUtils;
 import org.panda_lang.utilities.commons.IOUtils;
 import org.panda_lang.utilities.commons.console.Effect;
@@ -43,8 +42,8 @@ final class StatusCommand implements ReposiliteCommand {
         response.add("  Active: " + Effect.GREEN_BOLD + reposilite.getHttpServer().isAlive() + Effect.RESET);
         response.add("  Uptime: " + TimeUtils.format(reposilite.getUptime() / 1000.0 / 60.0) + "min");
         response.add("  Memory usage of process: " + getMemoryUsage());
-        response.add("  Disk usage: " + FilesUtils.humanReadableByteCount(reposilite.getRepositoryService().getDiskQuota().getUsage()));
-        response.add("  Cached metadata: " + reposilite.getMetadataService().getCacheSize());
+        response.add("  Disk usage: " + reposilite.getRepos().getQuota());
+        // Don't care, response.add("  Cached metadata: " + reposilite.getMetadataService().getCacheSize());
         response.add("  Exceptions: " + reposilite.getFailureService().getFailures().size());
         response.add("  Latest version of reposilite: " + latestVersion);
 

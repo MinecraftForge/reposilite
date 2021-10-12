@@ -18,13 +18,11 @@ package org.panda_lang.reposilite.config;
 
 import net.dzikoysk.cdn.entity.Description;
 
-import java.io.Serializable;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 
-@SuppressWarnings("serial")
-public final class Configuration implements Serializable {
+public final class Configuration {
 
     @Description("# ~~~~~~~~~~~~~~~~~~~~~~ #")
     @Description("#       Reposilite       #")
@@ -66,30 +64,7 @@ public final class Configuration implements Serializable {
     @Description("# Control the maximum amount of data assigned to Reposilite instance")
     @Description("# Supported formats: 90%, 500MB, 10GB")
     public String diskQuota = "10GB";
-    @Description("# List of supported Maven repositories.")
-    @Description("# First directory on the list is the main (primary) repository.")
-    @Description("# Tu mark repository as private, prefix its name with a dot, e.g. \".private\"")
-    public List<String> repositories = Arrays.asList("releases", "snapshots");
-    @Description("# Allow to omit name of the main repository in request")
-    @Description("# e.g. /org/panda-lang/reposilite will be redirected to /releases/org/panda-lang/reposilite")
-    public Boolean rewritePathsEnabled = true;
-    @Description("# Accept deployment connections")
-    public Boolean deployEnabled = true;
 
-    // Proxy
-    @Description("")
-    @Description("# List of proxied repositories.")
-    @Description("# Reposilite will search for an artifact in remote repositories listed below,")
-    @Description("# if the requested artifact was not found.")
-    public List<String> proxied = Collections.emptyList();
-    @Description("# Reposilite can store proxied artifacts locally to reduce response time and improve stability")
-    public Boolean storeProxied = true;
-    @Description("# Repository to store proxied items in, defaults to the repo that the file was requested on.")
-    @Description("# Set this value to a repository name to prevent duplicates, as well as organize.")
-    public String proxiedStorageRepo = "";
-    @Description("# Proxying is disabled by default in private repositories because of the security policy.")
-    @Description("# Enabling this feature may expose private data like i.e. artifact name used in your company.")
-    public Boolean proxyPrivate = false;
     @Description("# How long Reposilite can wait for establishing the connection with a remote host. (In seconds)")
     public Integer proxyConnectTimeout = 3;
     @Description("# How long Reposilite can read data from remote proxy. (In seconds)")
@@ -109,7 +84,43 @@ public final class Configuration implements Serializable {
     @Description("")
     @Description("# API Enabled")
     public boolean apiEnabled = true;
-    @Description("# API Requires Authentication")
-    public boolean apiRequiresAuth = false;
 
+    @SuppressWarnings("serial")
+    @Description({
+    "",
+    "# Repositories, in the order in which they will be searched.",
+    "# repositories {",
+    "#   releases {",
+    "#     # Prefix of paths that this repo will allow.",
+    "#     # May be empty to allow all paths",
+    "#     prefixes: []",
+    "#     # Wither or not this repo requires authentication to read.",
+    "#     hidden: false",
+    "#     # Weither this repo can be browsed by non-autheticated users.",
+    "#     beowseable: true",
+    "#     # Allow users with write access to upload.",
+    "#     allowUploads: true",
+    "#     # Control the maximum amount of data assigned to this repository.",
+    "#     # May be null/empty to use the global quota.",
+    "#     diskQuota: \"\"",
+    "#     # List of remote repositories to proxy",
+    "#     # Files not found locally will be attempted to be found",
+    "#     # in the following reposiories. And cached locally.",
+    "#     proxies: []",
+    "#   }",
+    "# }"
+    })
+    public LinkedHashMap<String, Repository> repositories = new LinkedHashMap<String, Repository>() {{
+        put("releases", new Repository());
+        put("snapshots", new Repository());
+    }};
+
+    public static class Repository {
+        public List<String> prefixes = Collections.emptyList();
+        public Boolean hidden = false;
+        public Boolean browseable = true;
+        public Boolean allowUploads = true;
+        public String diskQuota = "";
+        public List<String> proxies = Collections.emptyList();
+    }
 }

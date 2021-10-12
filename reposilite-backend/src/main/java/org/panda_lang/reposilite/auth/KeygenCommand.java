@@ -19,7 +19,6 @@ package org.panda_lang.reposilite.auth;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.console.ReposiliteCommand;
 import org.panda_lang.utilities.commons.StringUtils;
-import org.panda_lang.utilities.commons.collection.Pair;
 import org.panda_lang.utilities.commons.function.Option;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
@@ -38,9 +37,11 @@ final class KeygenCommand implements ReposiliteCommand {
     private String permissions;
 
     private final TokenService tokenService;
+    private final IAuthManager auth;
 
-    KeygenCommand(TokenService tokenService) {
+    KeygenCommand(TokenService tokenService, IAuthManager auth) {
         this.tokenService = tokenService;
+        this.auth = auth;
     }
 
     @Override
@@ -68,9 +69,10 @@ final class KeygenCommand implements ReposiliteCommand {
         Option<Token> previousToken = tokenService.getToken(alias);
 
         try {
-            Pair<String, Token> token = tokenService.createToken(processedPath, alias, permissions);
+            String password = auth.createRandomPassword();
+            auth.createToken(processedPath, alias, permissions, password);
             response.add("Generated new access token for " + alias + " (" + processedPath + ") with '" + permissions + "' permissions");
-            response.add(token.getKey());
+            response.add(password);
             tokenService.saveTokens();
             return true;
         }

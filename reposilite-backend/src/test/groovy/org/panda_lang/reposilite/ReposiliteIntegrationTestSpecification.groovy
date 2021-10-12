@@ -22,15 +22,22 @@ import com.google.api.client.http.HttpRequestFactory
 import com.google.api.client.http.HttpResponse
 import com.google.api.client.http.javanet.NetHttpTransport
 import groovy.transform.CompileStatic
+import net.dzikoysk.cdn.CdnFactory
+import net.dzikoysk.cdn.model.Configuration
+
 import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.io.TempDir
+import org.panda_lang.reposilite.auth.Token
 import org.panda_lang.reposilite.log.ReposiliteWriter
 import org.panda_lang.utilities.commons.ArrayUtils
+import org.panda_lang.utilities.commons.collection.Pair
+
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
-abstract class ReposiliteIntegrationTestSpecification extends ReposiliteTestSpecificationExtension {
+abstract class ReposiliteIntegrationTestSpecification {
 
     public static final String PORT = String.valueOf(new Random().nextInt(16383) + 49151)
     public static final HttpRequestFactory REQUEST_FACTORY = new NetHttpTransport().createRequestFactory()
@@ -78,6 +85,39 @@ abstract class ReposiliteIntegrationTestSpecification extends ReposiliteTestSpec
         return REQUEST_FACTORY.buildGetRequest(url(uri))
                 .setThrowExceptionOnExecuteError(false)
                 .execute()
+    }
+
+    protected static shouldReturn(int status, String uri) {
+        def response = getRequest(uri);
+        assertEquals status, response.statusCode;
+    }
+
+    protected static String shouldReturnData(int status, String uri) {
+        def response = getRequest(uri)
+        assertEquals status, response.statusCode
+        return response.parseAsString()
+    }
+
+    protected static String shouldReturnData(int status, String uri, Pair<String, Token> token) {
+        return shouldReturnData(status, uri, token.value.alias, token.key)
+    }
+
+    protected static String shouldReturnData(int status, String uri, String username, String password) {
+        def response = getAuthenticated(uri, username, password)
+        assertEquals status, response.statusCode
+        return response.parseAsString()
+    }
+
+    protected static Configuration shouldReturnJson(int status, String uri) {
+        return CdnFactory.createJson().load(shouldReturnData(status, uri))
+    }
+
+    protected static Configuration shouldReturnJson(int status, String uri, Pair<String, Token> token) {
+        return CdnFactory.createJson().load(shouldReturnData(status, uri, token))
+    }
+
+    protected static Configuration shouldReturnJson(int status, String uri, String username, String password) {
+        return CdnFactory.createJson().load(shouldReturnData(status, uri, username, password))
     }
 
     protected static HttpResponse getAuthenticated(String uri, String username, String password) {

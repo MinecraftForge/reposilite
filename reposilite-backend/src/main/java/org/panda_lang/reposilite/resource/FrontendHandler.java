@@ -20,14 +20,12 @@ import io.javalin.http.Context;
 import io.javalin.http.Handler;
 import io.javalin.plugin.openapi.annotations.OpenApi;
 import io.javalin.plugin.openapi.annotations.OpenApiResponse;
-import org.panda_lang.reposilite.Reposilite;
 
 public class FrontendHandler implements Handler {
+    private final FrontendProvider frontend;
 
-    private final Reposilite reposilite;
-
-    public FrontendHandler(Reposilite reposilite) {
-        this.reposilite = reposilite;
+    public FrontendHandler(FrontendProvider reposilite) {
+        this.frontend = reposilite;
     }
 
     @OpenApi(
@@ -41,7 +39,7 @@ public class FrontendHandler implements Handler {
     )
     @Override
     public void handle(Context context) {
-        context.result(reposilite.getFrontendService().getApp())
+        context.result(frontend.getApp())
                 .header("Content-Type", "application/javascript")
                 .res.setCharacterEncoding("UTF-8");
     }

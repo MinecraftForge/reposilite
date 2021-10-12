@@ -18,11 +18,12 @@ package org.panda_lang.reposilite.auth
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.config.Configuration
 import org.panda_lang.reposilite.error.FailureService
-import org.panda_lang.reposilite.repository.RepositoryService
+import org.panda_lang.reposilite.repository.IRepositoryManager
 
 import java.util.concurrent.Executors
 
@@ -33,28 +34,39 @@ class SessionTest {
 
     @TempDir
     protected static File WORKING_DIRECTORY
-    protected static RepositoryService REPOSITORY_SERVICE
+    protected static IRepositoryManager REPOSITORY_MANAGER
+    protected IAuthManager AUTH_MANAGER;
 
     @BeforeAll
     static void prepare () {
-        REPOSITORY_SERVICE = new RepositoryService(
-                WORKING_DIRECTORY.getAbsolutePath(),
-                '0',
-                Executors.newSingleThreadExecutor(),
-                Executors.newSingleThreadScheduledExecutor(),
-                new FailureService()
-        )
+        REPOSITORY_MANAGER = IRepositoryManager.builder()
+            .dir(WORKING_DIRECTORY)
+            .quota('0')
+            .executor(Executors.newSingleThreadExecutor())
+            .scheduled(Executors.newSingleThreadScheduledExecutor())
+            .repo("releases", {})
+            .repo("snapshots", {})
+            .build();
+    }
 
-        REPOSITORY_SERVICE.load(new Configuration())
+    @BeforeEach
+    void before() {
+        AUTH_MANAGER = IAuthManager.builder()
+            .dir(WORKING_DIRECTORY)
+            .repo(REPOSITORY_MANAGER)
+            .build();
     }
 
     @Test
     void 'has permission' () {
         def configuration = new Configuration()
-        configuration.repositories = Collections.emptyList()
+        configuration.repositories = new LinkedHashMap()
 
-        def token = new Token('/a/b/c', 'alias', 'rw', 'token')
-        def standardSession = new Session(token, REPOSITORY_SERVICE.getRepositories(token))
+        def token = AUTH_MANAGER.createToken('/a/b/c', 'alias', 'rw', 'token')
+        def signin = AUTH_MANAGER.getSession('alias:token')
+
+        assertTrue signin.isOk()
+        def standardSession = signin.get()
 
         assertTrue standardSession.hasPermissionTo('/a/b/c')
         assertTrue standardSession.hasPermissionTo('/a/b/c/d')
@@ -65,8 +77,11 @@ class SessionTest {
 
     @Test
     void 'has permission with wildcard' () {
-        def token = new Token('*/b/c', 'alias', 'rw', 'token')
-        def wildcardSession = new Session(token, REPOSITORY_SERVICE.getRepositories(token))
+        def token = AUTH_MANAGER.createToken('*/b/c', 'alias', 'rw', 'token')
+        def signin = AUTH_MANAGER.getSession('alias:token')
+
+        assertTrue signin.isOk()
+        def wildcardSession = signin.get()
 
         assertTrue wildcardSession.hasPermissionTo('/releases/b/c')
         assertTrue wildcardSession.hasPermissionTo('/releases/b/c/d')
@@ -79,11 +94,15 @@ class SessionTest {
 
     @Test
     void 'has root permission' () {
-        def standardToken = new Token('/', 'alias', 'rw', 'token')
-        def standardRootSession = new Session(standardToken, REPOSITORY_SERVICE.getRepositories(standardToken))
+        def standardToken = AUTH_MANAGER.createToken('/', 'alias', 'rw', 'token')
+        def signin = AUTH_MANAGER.getSession('alias:token')
+        assertTrue signin.isOk()
+        def standardRootSession = signin.get()
 
-        def wildcardToken = new Token('*', 'alias', 'rw', 'token')
-        def wildcardRootSession = new Session(wildcardToken, REPOSITORY_SERVICE.getRepositories(wildcardToken))
+        def wildcardToken = AUTH_MANAGER.createToken('*', 'wild', 'rw', 'token')
+        signin = AUTH_MANAGER.getSession('wild:token')
+        assertTrue signin.isOk()
+        def wildcardRootSession = signin.get()
 
         assertTrue standardRootSession.hasPermissionTo('/')
         assertFalse wildcardRootSession.hasPermissionTo('/')
@@ -93,15 +112,19 @@ class SessionTest {
 
     @Test
     void 'should contain repository from path' () {
-        def token = new Token('/releases', 'alias', 'rw', 'token')
-        def session = new Session(token, REPOSITORY_SERVICE.getRepositories(token))
-        assertEquals Collections.singletonList(REPOSITORY_SERVICE.getRepository('releases')), session.getRepositories()
+        def token = AUTH_MANAGER.createToken('/releases', 'alias', 'rw', 'token')
+        def signin = AUTH_MANAGER.getSession('alias:token')
+        assertTrue signin.isOk()
+        def session = signin.get()
+        assertEquals Collections.singletonList(REPOSITORY_MANAGER.getRepo('releases')), session.getRepositories()
     }
 
     @Test
     void 'should return empty list for unknown repository in path' () {
-        def token = new Token('/unknown_repository', 'alias', 'rw', 'token')
-        def session = new Session(token, REPOSITORY_SERVICE.getRepositories(token))
+        def token = AUTH_MANAGER.createToken('/unknown_repository', 'alias', 'rw', 'token')
+        def signin = AUTH_MANAGER.getSession('alias:token')
+        assertTrue signin.isOk()
+        def session = signin.get()
         assertEquals Collections.emptyList(), session.getRepositories()
     }
 

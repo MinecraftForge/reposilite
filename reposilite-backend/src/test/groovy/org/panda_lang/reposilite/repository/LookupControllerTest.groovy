@@ -24,87 +24,87 @@ import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
 import org.panda_lang.utilities.commons.FileUtils
 
+import static org.apache.http.HttpStatus.*
 import static org.junit.jupiter.api.Assertions.assertEquals
 import static org.junit.jupiter.api.Assertions.assertTrue
 
 @CompileStatic
 class LookupControllerTest extends ReposiliteIntegrationTestSpecification {
-
-    @TempDir
-    protected File proxiedWorkingDirectory
-
     {
-        super.properties.put("reposilite.repositories", "releases,snapshots,.private")
+        super.properties.put('reposilite.repositories', 'releases,snapshots,private')
+        super.properties.put('reposilite.repositories.private.hidden', 'true')
+    }
+
+    @Test
+    void 'should return 203 and frontend with directory access message' () {
+        assertResponseWithMessage SC_NON_AUTHORITATIVE_INFORMATION, '/releases/org/panda-lang', 'Directory access'
     }
 
     @Test
     void 'should return 203 and frontend with unsupported request message' () {
-        assertResponseWithMessage getRequest("/"), HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Unsupported request"
+        assertResponseWithMessage SC_NON_AUTHORITATIVE_INFORMATION, '/', 'Unsupported request'
     }
 
     @Test
-    void 'should return 404 for missing snapshot metadata file with builds not found message' () {
-        assertResponseWithMessage getRequest("/gav/1.0.0-SNAPSHOT/maven-metadata.xml"), HttpStatus.SC_NOT_FOUND, "Latest build not found"
+    void 'should return 404 for missing group level meta' () {
+        assertResponseWithMessage SC_NOT_FOUND, '/gav/1.0.0-SNAPSHOT/maven-metadata.xml', 'Artifact maven-metadata.xml not found'
+    }
+
+    @Test
+    void 'should return 404 for missing file that is not a valid maven path' () {
+        assertResponseWithMessage SC_NOT_FOUND, '/gav/1.0.0-SNAPSHOT/missing', 'Invalid artifact path'
     }
 
     @Test
     void 'should return 203 and frontend with missing artifact identifier' () {
-        assertResponseWithMessage getRequest("/releases/groupId"), HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Missing artifact identifier";
+        assertResponseWithMessage SC_NON_AUTHORITATIVE_INFORMATION, '/releases/groupId', 'Missing artifact identifier'
     }
 
     @Test
     void 'should return 404 and frontend with proxied repositories are not enabled message' () {
-        assertResponseWithMessage getRequest("/releases/groupId/artifactId"), HttpStatus.SC_NOT_FOUND, "Artifact artifactId not found"
+        assertResponseWithMessage SC_NOT_FOUND, '/releases/groupId/artifactId/version/file', 'Artifact file not found'
     }
 
     @Test
     void 'should return 200 and metadata file' () {
-        def response = getRequest("/releases/org/panda-lang/reposilite-test/maven-metadata.xml")
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-        assertTrue response.parseAsString().contains("<version>1.0.0</version>")
+        def response = shouldReturn200AndData('/releases/org/panda-lang/reposilite-test/maven-metadata.xml')
+        assertTrue response.contains('<version>1.0.0</version>')
     }
 
     @Test
     void 'should return 200 and latest version' () {
-        def response = getRequest("/releases/org/panda-lang/reposilite-test/latest")
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-        assertEquals "1.0.1-SNAPSHOT", response.parseAsString()
+        def response = shouldReturn200AndData('/releases/org/panda-lang/reposilite-test/latest')
+        assertEquals '1.0.1-SNAPSHOT', response
     }
 
     @Test
     void 'should return 404 and frontend with latest version not found' () {
-        assertResponseWithMessage(
-                getRequest("/releases/org/panda-lang/reposilite-test/reposilite-test-1.0.0.jar/latest"),
-                HttpStatus.SC_NOT_FOUND,
-                "Latest version not found")
+        assertResponseWithMessage(SC_NOT_FOUND, '/releases/org/panda-lang/reposilite-test/reposilite-test-1.0.0.jar/latest', 'Latest version not found')
     }
 
+    /* Why would he do this? Maven should request the correct file, we shouldn't need to re-write.
     @Test
     void 'should return 200 and resolved snapshot file' () {
-        def response = getRequest("/releases/org/panda-lang/reposilite-test/1.0.0-SNAPSHOT/reposilite-test-1.0.0-SNAPSHOT.pom")
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-        assertTrue response.parseAsString().contains("<version>1.0.0-SNAPSHOT</version>")
+        def response = shouldReturn200AndData('/releases/org/panda-lang/reposilite-test/1.0.0-SNAPSHOT/reposilite-test-1.0.0-SNAPSHOT.pom')
+        assertTrue response.contains('<version>1.0.0-SNAPSHOT</version>')
     }
+    */
 
     @Test
     void 'should return 404 and artifact not found message' () {
-        assertResponseWithMessage(
-                getRequest("/releases/org/panda-lang/reposilite-test/1.0.0/artifactId"),
-                HttpStatus.SC_NOT_FOUND,
-                "Artifact artifactId not found")
+        assertResponseWithMessage(SC_NOT_FOUND, '/releases/org/panda-lang/reposilite-test/1.0.0/artifactId', 'Artifact artifactId not found')
     }
 
     @Test
     void 'should return 200 and requested file' () {
-        def response = getRequest("/releases/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.pom")
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-        assertTrue response.parseAsString().contains("<version>1.0.0</version>")
+        def response = shouldReturn200AndData('/releases/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.pom')
+        assertTrue response.contains("<version>1.0.0</version>")
     }
 
     @Test
     void 'should return 200 and head requested file' () {
         def response = REQUEST_FACTORY
-                .buildHeadRequest(url("/releases/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.pom"))
+                .buildHeadRequest(url('/releases/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.pom'))
                 .execute()
 
         assertEquals HttpStatus.SC_OK, response.getStatusCode()
@@ -113,40 +113,16 @@ class LookupControllerTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 401 with unauthorized message' () {
-        assertResponseWithMessage getRequest("/private/a/b"), HttpStatus.SC_UNAUTHORIZED, "Unauthorized request"
+        assertResponseWithMessage SC_UNAUTHORIZED, '/private/a/b', 'Unauthorized request'
     }
 
-    @Test
-    void 'should return 200 and proxied file' () {
-        def proxyPort = String.valueOf(Integer.parseInt(PORT) + 1)
-        super.reposilite.getConfiguration().proxied = Collections.singletonList("http://localhost:" + proxyPort)
-
-        try {
-            def proxiedReposilite = super.reposilite(proxyPort, proxiedWorkingDirectory)
-            proxiedReposilite.launch()
-
-            def proxiedFile = new File(proxiedWorkingDirectory, "/repositories/releases/proxiedGroup/proxiedArtifact/proxied.txt")
-            proxiedFile.getParentFile().mkdirs()
-            proxiedFile.createNewFile()
-            FileUtils.overrideFile(proxiedFile, "proxied content")
-
-            def response = getRequest("/releases/proxiedGroup/proxiedArtifact/proxied.txt")
-            assertEquals HttpStatus.SC_OK, response.getStatusCode()
-
-            def content = response.parseAsString()
-            assertEquals "proxied content", content
-
-            proxiedReposilite.forceShutdown()
-        }
-        finally {
-            System.clearProperty("reposilite.port")
-        }
-    }
-
-    static void assertResponseWithMessage(HttpResponse response, int status, String message) {
-        assertEquals(status, response.getStatusCode())
-        def content = response.parseAsString()
+    private static void assertResponseWithMessage(int status, String url, String message) {
+        def content = shouldReturnData(status, url)
         assertTrue(content.contains("REPOSILITE_MESSAGE = '" + message + "'"));
+    }
+
+    private static String shouldReturn200AndData(String url) {
+        return shouldReturnData(SC_OK, url)
     }
 
 }

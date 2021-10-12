@@ -20,9 +20,9 @@ import groovy.transform.CompileStatic
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.panda_lang.reposilite.repository.IRepository.Builder
 
-import static org.junit.jupiter.api.Assertions.assertEquals
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 class RepositoryTest {
@@ -30,19 +30,20 @@ class RepositoryTest {
     @TempDir
     protected static File temp
 
-    private static Repository repository
+    private static IRepository repository
 
     @BeforeAll
     static void prepare() {
-        repository = new Repository(temp, "releases", false)
+        repository = IRepository.builder("releases").dir(temp).build();
+
         repository.getFile("group", "artifact", "version").mkdirs()
         repository.getFile("group", "artifact", "version", "test").createNewFile()
     }
 
     @Test
     void 'should find requested entity' () {
-        assertFalse repository.find("unknown").isPresent()
-        assertEquals "test", Objects.requireNonNull(repository.find("group", "artifact", "version", "test")).get().getFile("test").getName()
+        assertFalse repository.contains("unknown")
+        assertTrue repository.contains("group", "artifact", "version", "test")
     }
 
     @Test

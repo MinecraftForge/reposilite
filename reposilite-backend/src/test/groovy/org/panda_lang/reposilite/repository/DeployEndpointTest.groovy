@@ -37,29 +37,36 @@ import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
+    {
+        super.properties.put('reposilite.repositories', 'releases,snapshots,private,zero')
+        super.properties.put('reposilite.repositories.private.hidden', 'true')
+        super.properties.put('reposilite.repositories.private.allowUploads', 'false')
+        super.properties.put('reposilite.repositories.zero.diskQuota', '0MB')
+    }
 
     private final HttpClient client = HttpClients.createDefault()
 
     @BeforeEach
     void configure() {
-        super.reposilite.getAuthService().createToken('/releases/auth/test', 'authtest', 'rwm', 'secure')
+        super.reposilite.getAuth().createToken('/', 'root', 'rwm', 'password')
+        super.reposilite.getAuth().createToken('/', 'read', 'r', 'password')
+        super.reposilite.getAuth().createToken('/releases/auth/test', 'authtest', 'rwm', 'secure')
+        super.reposilite.getAuth().createToken('/private', 'private', 'rwm', 'secure')
+    }
+
+    @Test
+    void 'should return 507 and out of disk space message' () throws Exception {
+        shouldReturnErrorWithGivenMessage '/zero/groupId/artifactId/file', 'root', 'password', 'content', HttpStatus.SC_INSUFFICIENT_STORAGE, 'Out of disk space'
+    }
+
+    @Test
+    void 'should return 401 and permissions message' () throws Exception {
+        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'read', 'password', 'content', HttpStatus.SC_UNAUTHORIZED, 'Cannot deploy artifact without write permission'
     }
 
     @Test
     void 'should return 405 and artifact deployment is disabled message' () throws Exception {
-        def deployService = new DeployService(
-                false,
-                false,
-                reposilite.getAuthService(),
-                reposilite.getRepositoryService(),
-                reposilite.getMetadataService())
-
-        def result = deployService.deploy(new ReposiliteContext('/releases/groupId/artifactId/file', 'GET', '', [:], { null }))
-        assertTrue result.isErr()
-
-        def error = result.getError()
-        assertEquals HttpStatus.SC_METHOD_NOT_ALLOWED, error.status
-        assertEquals 'Artifact deployment is disabled', error.message
+        shouldReturnErrorWithGivenMessage '/private/groupId/artifactId/file', 'private', 'secure', 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Artifact deployment is disabled'
     }
 
     @Test

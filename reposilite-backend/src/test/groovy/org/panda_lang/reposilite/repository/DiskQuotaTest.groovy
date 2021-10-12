@@ -31,34 +31,34 @@ final class DiskQuotaTest {
 
     @Test
     void 'should create quota of the given percentage' () {
-        def quota = DiskQuota.of(workingDirectory, '90%')
+        def quota = DiskQuota.ofPercentage(workingDirectory, '90%')
         def size = quota.@quota.longValue()
 
         assertTrue size > 0
         assertEquals 0, quota.@usage.longValue()
-        assertTrue quota.hasUsableSpace()
+        assertTrue quota.notFull()
 
         quota.allocate(1)
-        assertTrue quota.hasUsableSpace()
+        assertTrue quota.notFull()
 
         quota.allocate(size)
-        assertFalse quota.hasUsableSpace()
+        assertFalse quota.notFull()
     }
 
     @Test
     void 'should create quota of the given size' () {
         def size = 10L * 1024 * 1024 * 1024
-        def quota = DiskQuota.of(workingDirectory, '10GB')
+        def quota = DiskQuota.of('10GB')
 
         assertEquals size, quota.@quota.longValue()
         assertEquals 0, quota.@usage.longValue()
-        assertTrue quota.hasUsableSpace()
+        assertTrue quota.notFull()
 
         quota.allocate(1)
-        assertTrue quota.hasUsableSpace()
+        assertTrue quota.notFull()
 
         quota.allocate(size)
-        assertFalse quota.hasUsableSpace()
+        assertFalse quota.notFull()
     }
 
 }

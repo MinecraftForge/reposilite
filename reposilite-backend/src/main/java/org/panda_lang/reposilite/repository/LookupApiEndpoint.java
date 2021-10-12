@@ -17,7 +17,6 @@
 package org.panda_lang.reposilite.repository;
 
 import io.javalin.http.Context;
-import io.javalin.http.Handler;
 import io.javalin.plugin.openapi.annotations.OpenApi;
 import io.javalin.plugin.openapi.annotations.OpenApiContent;
 import io.javalin.plugin.openapi.annotations.OpenApiParam;
@@ -25,8 +24,8 @@ import io.javalin.plugin.openapi.annotations.OpenApiResponse;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteContextFactory;
-import org.panda_lang.reposilite.ReposiliteUtils;
+import org.panda_lang.reposilite.auth.IAuthManager;
+import org.panda_lang.reposilite.auth.IAuthedHandler;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
@@ -34,80 +33,92 @@ import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataUtils;
 import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.utilities.commons.StringUtils;
-import org.panda_lang.utilities.commons.collection.Pair;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.PandaStream;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
-public final class LookupApiEndpoint implements Handler {
+final class LookupApiEndpoint implements IAuthedHandler {
+    private final IRepositoryManager repos;
+    private final IAuthManager auth;
 
-    private final boolean rewritePathsEnabled;
-    private final boolean apiRequiresAuth;
-    private final ReposiliteContextFactory contextFactory;
-    private final RepositoryAuthenticator repositoryAuthenticator;
-    private final RepositoryService repositoryService;
-
-    public LookupApiEndpoint(
-            boolean rewritePathsEnabled,
-            boolean apiRequiresAuth,
-            ReposiliteContextFactory contextFactory,
-            RepositoryAuthenticator repositoryAuthenticator,
-            RepositoryService repositoryService) {
-
-        this.rewritePathsEnabled = rewritePathsEnabled;
-        this.apiRequiresAuth = apiRequiresAuth;
-        this.contextFactory = contextFactory;
-        this.repositoryAuthenticator = repositoryAuthenticator;
-        this.repositoryService = repositoryService;
+    public LookupApiEndpoint(IRepositoryManager repos, IAuthManager auth) {
+        this.repos = repos;
+        this.auth = auth;
     }
 
     @OpenApi(
-            operationId = "repositoryApi",
-            summary = "Browse the contents of repositories using API",
-            description = "Get details about the requested file as JSON response",
-            tags = { "Repository" },
-            pathParams = {
-                    @OpenApiParam(name = "*", description = "Artifact path qualifier", required = true, allowEmptyValue = true),
-            },
-            responses = {
-                    @OpenApiResponse(
-                            status = "200",
-                            description = "Returns document (different for directory and file) that describes requested resource",
-                            content = {
-                                    @OpenApiContent(from = FileDetailsDto.class),
-                                    @OpenApiContent(from = FileListDto.class)
-                            }
-                    ),
-                    @OpenApiResponse(
-                            status = "401",
-                            description = "Returns 401 in case of unauthorized attempt of access to private repository",
-                            content = @OpenApiContent(from = ErrorDto.class)
-                    ),
-                    @OpenApiResponse(
-                            status = "404",
-                            description = "Returns 404 (for Maven) and frontend (for user) as a response if requested artifact is not in the repository"
-                    ),
-            }
+        operationId = "repositoryApi",
+        summary = "Browse the contents of repositories using API",
+        description = "Get details about the requested file as JSON response",
+        tags = { "Repository" },
+        pathParams = {
+            @OpenApiParam(name = "*", description = "Artifact path qualifier", required = true, allowEmptyValue = true),
+        },
+        responses = {
+            @OpenApiResponse(
+                status = "200",
+                description = "Returns document (different for directory and file) that describes requested resource",
+                content = {
+                    @OpenApiContent(from = FileDetailsDto.class),
+                    @OpenApiContent(from = FileListDto.class)
+                }
+            ),
+            @OpenApiResponse(
+                status = "401",
+                description = "Returns 401 in case of unauthorized attempt of access to private repository",
+                content = @OpenApiContent(from = ErrorDto.class)
+            ),
+            @OpenApiResponse(
+                status = "404",
+                description = "Returns 404 (for Maven) and frontend (for user) as a response if requested artifact is not in the repository"
+            ),
+        }
     )
     @Override
-    public void handle(Context ctx) {
-        ReposiliteContext context = contextFactory.create(ctx);
+    public void handle(Context ctx, ReposiliteContext context) {
         Reposilite.getLogger().info("API " + context.uri() + " from " + context.address());
 
-        Option<String> normalizedUri = ReposiliteUtils.normalizeUri(rewritePathsEnabled, repositoryService, StringUtils.replaceFirst(context.uri(), "/api", ""));
-
-        if (normalizedUri.isEmpty()) {
+        if (context.normalized() == null) {
             ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path"));
             return;
         }
 
-        String uri = normalizedUri.get();
+        String uri = context.normalized();
 
-        if (apiRequiresAuth) {
-            Result<Session, String> auth = repositoryAuthenticator.getAuthService().authByHeader(context.headers());
+        if ("/".equals(uri) || StringUtils.isEmpty(uri)) {
+            Option<Session> session = auth.getSession(context.headers(), null).toOption();
+            List<IRepository> viewable = repos.getRepos().stream()
+                .filter(repo -> (repo.canBrowse() && !repo.isHidden()) || session.map(value -> value.getRepositories().contains(repo)).orElseGet(false))
+                .collect(Collectors.toList());
+
+            // There are repos, but none that can be anonymously browsed, return unauthorized
+            if (!session.isPresent() && viewable.isEmpty() && !repos.getRepos().isEmpty()) {
+                ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_UNAUTHORIZED, "Unauthorized request"));
+                return;
+            }
+
+            // Even if its empty (the logged in user has no view rights) send the result
+            ctx.json(new FileListDto(viewable.stream()
+                .map(IRepository::getFile)
+                .map(FileDetailsDto::of)
+                .collect(Collectors.toList()))
+            );
+            return;
+        }
+
+        IRepository repo = context.repo();
+        if (repo == null) {
+            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + uri));
+            return;
+        }
+
+        if (!repo.canBrowse() || repo.isHidden()) {
+            Result<Session, String> auth = this.auth.getSession(context.headers(), uri);
             if (auth.isErr()) {
                 ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.getError());
                 return;
@@ -120,20 +131,8 @@ public final class LookupApiEndpoint implements Handler {
             }
         }
 
-        if ("/".equals(uri) || StringUtils.isEmpty(uri)) {
-            ctx.json(repositoryAuthenticator.findAvailableRepositories(context.headers()));
-            return;
-        }
-
-        Result<Pair<String[], Repository>, ErrorDto> result = repositoryAuthenticator.authRepository(context.headers(), uri);
-
-        if (result.isErr()) {
-            ResponseUtils.errorResponse(ctx, result.getError().getStatus(), result.getError().getMessage());
-            return;
-        }
-
-        File requestedFile = repositoryService.getFile(uri);
-        Optional<FileDetailsDto> latest = repositoryService.findLatest(requestedFile);
+        File requestedFile = repo.getFile(context.filepath());
+        Optional<FileDetailsDto> latest = findLatest(requestedFile);
 
         if (latest.isPresent()) {
             ctx.json(latest.get());
@@ -156,4 +155,19 @@ public final class LookupApiEndpoint implements Handler {
                 .toList()));
     }
 
+
+    //TODO: Deprecate this API?
+    private Optional<FileDetailsDto> findLatest(File requestedFile) {
+        if (requestedFile.getName().equals("latest")) {
+            File parent = requestedFile.getParentFile();
+
+            if (parent != null && parent.exists()) {
+                File[] files = MetadataUtils.toSortedVersions(parent);
+                if (files.length > 0)
+                    return Optional.of(FileDetailsDto.of(files[0]));
+            }
+        }
+
+        return Optional.empty();
+    }
 }

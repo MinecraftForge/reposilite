@@ -45,8 +45,8 @@ class RemoteExecutionEndpointTest extends ReposiliteIntegrationTestSpecification
 
     @BeforeEach
     void prepare () {
-        super.reposilite.getAuthService().createToken('', MANAGER_ALIAS, 'm', MANAGER_TOKEN);
-        super.reposilite.getAuthService().createToken('', STANDARD_ALIAS, '', STANDARD_TOKEN);
+        super.reposilite.getAuth().createToken('', MANAGER_ALIAS, 'm', MANAGER_TOKEN);
+        super.reposilite.getAuth().createToken('', STANDARD_ALIAS, '', STANDARD_TOKEN);
     }
 
     @Test

@@ -18,33 +18,38 @@ package org.panda_lang.reposilite.auth;
 
 import org.jetbrains.annotations.Nullable;
 import org.panda_lang.reposilite.Reposilite;
-import org.panda_lang.reposilite.repository.RepositoryService;
+import org.panda_lang.reposilite.repository.IRepository;
+import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 final class Authenticator {
-
-    private final RepositoryService repositoryService;
+    private final IRepositoryManager repos;
     private final TokenService tokenService;
     TokenService getTokenService() { return this.tokenService; }
 
-    public Authenticator(File workingDirectory, RepositoryService repositoryService) {
-        this.repositoryService = repositoryService;
+    public Authenticator(File workingDirectory, IRepositoryManager repos) {
+        this.repos = repos;
         this.tokenService = new TokenService(workingDirectory);
     }
 
-    public Result<Session, String> authByUri(Map<String, String> header, String uri) {
+    public Result<Session, String> getSession(Map<String, String> header, String uri) {
+        Result<Session, String> authResult = authByHeader(header);
+        if (uri == null)
+            return authResult;
+
         if (!uri.startsWith("/")) {
             uri = "/" + uri;
         }
-
-        Result<Session, String> authResult = authByHeader(header);
 
         if (authResult.isErr()) {
             Reposilite.getLogger().debug(authResult.getError());
@@ -61,7 +66,7 @@ final class Authenticator {
         return authResult;
     }
 
-    public Result<Session, String> authByHeader(Map<String, String> header) {
+    private Result<Session, String> authByHeader(Map<String, String> header) {
         String authorization = header.get("Authorization");
         Reposilite.getLogger().debug("Header ---");
 
@@ -80,10 +85,10 @@ final class Authenticator {
         String base64Credentials = authorization.substring("Basic".length()).trim();
         String credentials = new String(Base64.getDecoder().decode(base64Credentials), StandardCharsets.UTF_8);
 
-        return authByCredentials(credentials);
+        return getSession(credentials);
     }
 
-    public Result<Session, String> authByCredentials(@Nullable String credentials) {
+    public Result<Session, String> getSession(@Nullable String credentials) {
         if (credentials == null) {
             return Result.error("Authorization credentials are not specified");
         }
@@ -107,7 +112,23 @@ final class Authenticator {
             return Result.error("Invalid authorization credentials");
         }
 
-        return Result.ok(new Session(token, repositoryService.getRepositories(token)));
+        return Result.ok(new Session(token, getRepositories(token)));
+    }
+
+    private List<IRepository> getRepositories(Token token) {
+        if (token.hasMultiaccess()) {
+            return Collections.unmodifiableList(new ArrayList<>(this.repos.getRepos()));
+        }
+
+        for (IRepository repository : this.repos.getRepos()) {
+            String name = "/" + repository.getName();
+
+            if (token.getPath().startsWith(name)) {
+                return Collections.singletonList(repository);
+            }
+        }
+
+        return Collections.emptyList();
     }
 
 }

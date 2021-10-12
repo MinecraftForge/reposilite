@@ -16,9 +16,7 @@
 
 package org.panda_lang.reposilite;
 
-import org.panda_lang.reposilite.repository.Repository;
-import org.panda_lang.reposilite.repository.RepositoryService;
-import org.panda_lang.utilities.commons.StringUtils;
+import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.utilities.commons.function.Option;
 
 public final class ReposiliteUtils {
@@ -37,8 +35,10 @@ public final class ReposiliteUtils {
      * @param rewritePathsEnabled determines if path rewriting is enabled
      * @param uri the uri to process
      * @return the normalized uri
+     *
+     * TODO: Move to the context generator itself.
      */
-    public static Option<String> normalizeUri(boolean rewritePathsEnabled, RepositoryService repositoryService, String uri) {
+    public static Option<String> normalizeUri(IRepositoryManager repoManager, String uri) {
         while (uri.startsWith("/")) {
             uri = uri.substring(1);
         }
@@ -47,21 +47,16 @@ public final class ReposiliteUtils {
             return Option.none();
         }
 
-        if (!rewritePathsEnabled) {
+        int idx = uri.indexOf('/');
+        if (idx == -1 || uri.indexOf('/', idx + 1) == -1) { // At least 2 directories, why? Dunno
             return Option.of(uri);
         }
 
-        if (StringUtils.countOccurrences(uri, "/") <= 1) {
+        String first = uri.substring(0, idx);
+        if (repoManager.getRepo(first) != null)
             return Option.of(uri);
-        }
 
-        for (Repository repository : repositoryService.getRepositories()) {
-            if (uri.startsWith(repository.getName())) {
-                return Option.of(uri);
-            }
-        }
-
-        return Option.of(repositoryService.getPrimaryRepository().getName() + "/" + uri);
+        return Option.of(repoManager.getPrimaryRepository().getName() + "/" + uri);
     }
 
 }

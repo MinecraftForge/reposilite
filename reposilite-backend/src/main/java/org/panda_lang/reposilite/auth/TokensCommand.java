@@ -32,7 +32,7 @@ final class TokensCommand implements ReposiliteCommand {
 
     @Override
     public boolean execute(List<String> response) {
-        response.add("Tokens (" + tokenService.count() + ")");
+        response.add("Tokens (" + tokenService.getTokens().size() + ")");
 
         for (Token token : tokenService.getTokens()) {
             response.add(token.getPath() + " as " + token.getAlias() + " with '" + token.getPermissions() + "' permissions");

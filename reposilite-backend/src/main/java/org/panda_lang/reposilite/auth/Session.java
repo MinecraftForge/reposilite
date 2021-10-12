@@ -16,19 +16,20 @@
 
 package org.panda_lang.reposilite.auth;
 
-import org.panda_lang.reposilite.repository.Repository;
-
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.panda_lang.reposilite.repository.IRepository;
+
+// TODO: Api-ify this
 public final class Session {
 
     public static final String WILDCARD = "*";
 
     private final Token token;
-    private final List<Repository> repositories;
+    private final List<IRepository> repositories;
 
-    public Session(Token token, List<Repository> repositories) {
+    Session(Token token, List<IRepository> repositories) {
         this.token = token;
         this.repositories = repositories;
     }
@@ -45,7 +46,7 @@ public final class Session {
         String tokenPath = token.getPath();
 
         if (token.isWildcard()) {
-            for (Repository repository : repositories) {
+            for (IRepository repository : repositories) {
                 String name = "/" + repository.getName();
 
                 if (path.startsWith(name)) {
@@ -67,13 +68,13 @@ public final class Session {
         return false;
     }
 
-    public List<Repository> getRepositories() {
+    public List<IRepository> getRepositories() {
         return repositories;
     }
 
     public List<String> getRepositoryNames() {
         return repositories.stream()
-                .map(Repository::getName)
+                .map(IRepository::getName)
                 .collect(Collectors.toList());
     }
 

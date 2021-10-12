@@ -18,10 +18,8 @@ package org.panda_lang.reposilite.console;
 
 import io.javalin.websocket.WsConfig;
 import org.panda_lang.reposilite.Reposilite;
-import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteContextFactory;
 import org.panda_lang.reposilite.ReposiliteExecutor;
-import org.panda_lang.reposilite.auth.AuthService;
+import org.panda_lang.reposilite.auth.IAuthManager;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.log.ReposiliteWriter;
 import org.panda_lang.utilities.commons.StringUtils;
@@ -33,18 +31,17 @@ public final class CliController implements Consumer<WsConfig> {
 
     private static final String AUTHORIZATION_PREFIX = "Authorization:";
 
-    private final ReposiliteContextFactory contextFactory;
+    private final String forwardedIpHeader;
     private final ReposiliteExecutor reposiliteExecutor;
-    private final AuthService auth;
+    private final IAuthManager auth;
     private final Console console;
 
     public CliController(
-            ReposiliteContextFactory contextFactory,
+            String forwardedIpHeader,
             ReposiliteExecutor reposiliteExecutor,
-            AuthService auth,
+            IAuthManager auth,
             Console console) {
-
-        this.contextFactory = contextFactory;
+        this.forwardedIpHeader = forwardedIpHeader;
         this.reposiliteExecutor = reposiliteExecutor;
         this.auth = auth;
         this.console = console;
@@ -53,27 +50,28 @@ public final class CliController implements Consumer<WsConfig> {
     @Override
     public void accept(WsConfig wsConfig) {
         wsConfig.onConnect(connectContext -> wsConfig.onMessage(authContext -> {
-            ReposiliteContext context = contextFactory.create(authContext);
-            String authMessage = authContext.message();
+            String realIp = authContext.header(this.forwardedIpHeader);
+            String address = StringUtils.isEmpty(realIp) ? authContext.session.getRemoteAddress().toString() : realIp;
 
+            String authMessage = authContext.message();
             if (!authMessage.startsWith(AUTHORIZATION_PREFIX)) {
-                Reposilite.getLogger().info("CLI | Unauthorized CLI access request from " + context.address() + " (missing credentials)");
+                Reposilite.getLogger().info("CLI | Unauthorized CLI access request from " + address + " (missing credentials)");
                 connectContext.send("Unauthorized connection request");
                 connectContext.session.disconnect();
                 return;
             }
 
             String credentials = StringUtils.replaceFirst(authMessage, AUTHORIZATION_PREFIX, "");
-            Result<Session, String> auth = this.auth.authByCredentials(credentials);
+            Result<Session, String> auth = this.auth.getSession(credentials);
 
             if (!auth.isOk() || !auth.get().isManager()) {
-                Reposilite.getLogger().info("CLI | Unauthorized CLI access request from " + context.address());
+                Reposilite.getLogger().info("CLI | Unauthorized CLI access request from " + address);
                 connectContext.send("Unauthorized connection request");
                 connectContext.session.disconnect();
                 return;
             }
 
-            String username = auth.get().getAlias() + "@" + context.address();
+            String username = auth.get().getAlias() + "@" + address;
 
             wsConfig.onClose(closeContext -> {
                 Reposilite.getLogger().info("CLI | " + username + " closed connection");
@@ -93,5 +91,4 @@ public final class CliController implements Consumer<WsConfig> {
             }
         }));
     }
-
 }

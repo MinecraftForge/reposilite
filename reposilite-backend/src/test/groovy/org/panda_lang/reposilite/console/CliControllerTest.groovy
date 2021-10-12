@@ -43,10 +43,11 @@ class CliControllerTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should authorize and send messages' () {
-        def result = super.reposilite.getAuthService().createToken('/', 'admin', 'rwm')
+        def password = 'password'
+        def token = super.reposilite.getAuth().createToken('/', 'admin', 'rwm', password)
         def output = new StringBuilder()
 
-        def session = connect("admin", result.getKey(), { s, message ->
+        def session = connect("admin", password, { s, message ->
             output.append(message)
 
             if (message.contains("Done")) {

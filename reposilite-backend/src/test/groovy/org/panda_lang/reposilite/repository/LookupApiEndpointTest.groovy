@@ -23,19 +23,21 @@ import net.dzikoysk.cdn.model.Configuration
 import org.apache.http.HttpStatus
 import org.junit.jupiter.api.Test
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
+import org.panda_lang.reposilite.auth.Token
+import org.panda_lang.utilities.commons.collection.Pair
 
 import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
-
     {
-        super.properties.put('reposilite.repositories', 'releases,snapshots,.private')
+        super.properties.put('reposilite.repositories', 'releases,snapshots,private')
+        super.properties.put('reposilite.repositories.private.hidden', 'true')
     }
 
     @Test
     void 'should return list of repositories' () {
-        def repositories = shouldReturn200AndJsonResponse('/api')
+        def repositories = shouldReturn200AndJson('/api')
         assertNotNull repositories.get('files')
 
         def files = repositories.getSection('files').get()
@@ -46,13 +48,9 @@ class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return list of all authenticated repositories' () {
-        def secret = super.reposilite.getAuthService().createToken('/private', 'secret', 'rwm')
-
-        def response = getAuthenticated('/api', 'secret', secret.getKey())
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-
-        def repositories = CdnFactory.createJson().load(response.parseAsString())
-        def files = repositories.getSection('files').get()
+        def token = super.reposilite.getAuth().createToken('/private', 'secret', 'rwm', 'password')
+        def response = shouldReturn200AndJson('/api', token.alias, 'password')
+        def files = response.getSection('files').get()
         assertEquals 3, files.size()
         assertEquals 'releases', files.getSection(0).get().getString('name').get()
         assertEquals 'snapshots', files.getSection(1).get().getString('name').get()
@@ -61,36 +59,39 @@ class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 200 and latest file' () {
-        def result = shouldReturn200AndJsonResponse('/api/org/panda-lang/reposilite-test/latest')
+        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/latest')
         assertEquals 'directory', result.getString('type').get()
         assertEquals '1.0.1-SNAPSHOT', result.getString('name').get()
     }
 
     @Test
     void 'should return 404 if requested file is not found' () {
-        def response = getRequest('/api/org/panda-lang/reposilite-test/unknown')
-        assertEquals HttpStatus.SC_NOT_FOUND, response.getStatusCode()
-        assertTrue response.parseAsString().contains('File not found')
+        def response = shouldReturn404AndData('/api/org/panda-lang/reposilite-test/unknown')
+        assertTrue response.contains('File not found')
     }
 
     @Test
     void 'should return 200 and file dto' () {
-        def result = shouldReturn200AndJsonResponse('/api/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.jar')
+        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.jar')
         assertEquals 'file', result.getString('type').get()
         assertEquals 'reposilite-test-1.0.0.jar', result.getString('name').get()
     }
 
     @Test
     void 'should return 200 and directory dto' () {
-        def result = shouldReturn200AndJsonResponse('/api/org/panda-lang/reposilite-test')
+        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test')
         def files = result.getSection('files').get()
         assertEquals '1.0.1-SNAPSHOT', files.getSection(0).get().getString('name').get()
     }
 
-    private static Configuration shouldReturn200AndJsonResponse(String uri) {
-        def response = getRequest(uri)
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-        return CdnFactory.createJson().load(response.parseAsString())
+    private static Configuration shouldReturn200AndJson(String uri) {
+        return shouldReturnJson(HttpStatus.SC_OK, uri)
+    }
+    private static Configuration shouldReturn200AndJson(String uri, String username, String password) {
+        return shouldReturnJson(HttpStatus.SC_OK, uri, username, password)
+    }
+    private static String shouldReturn404AndData(String uri) {
+        return shouldReturnData(HttpStatus.SC_NOT_FOUND, uri)
     }
 
 }

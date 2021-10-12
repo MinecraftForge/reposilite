@@ -18,8 +18,10 @@ package org.panda_lang.reposilite.metadata;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import org.panda_lang.reposilite.error.FailureService;
-import org.panda_lang.reposilite.repository.Repository;
+
+import org.panda_lang.reposilite.Reposilite;
+import org.panda_lang.reposilite.ReposiliteConfiguration;
+import org.panda_lang.reposilite.repository.IRepository;
 import org.panda_lang.reposilite.utils.ArrayUtils;
 import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.utilities.commons.FileUtils;
@@ -35,27 +37,27 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiConsumer;
 
-public final class MetadataService {
-
+//TODO: Remove this entire generation system.
+public final class MetadataService implements ReposiliteConfiguration {
     private static final Lazy<XmlMapper> XML_MAPPER = new Lazy<>(() -> XmlMapper.xmlBuilder()
             .serializationInclusion(Include.NON_NULL)
             .defaultUseWrapper(false)
             .build());
 
     private final Map<String, String> metadataCache = new HashMap<>();
-    private final FailureService failureService;
+    private final BiConsumer<String, Exception> errorHandler;
 
-    public MetadataService(FailureService failureService) {
-        this.failureService = failureService;
+    public MetadataService(BiConsumer<String, Exception> errorHandler) {
+        this.errorHandler = errorHandler;
     }
 
-    public Result<String, String> generateMetadata(Repository repository, String[] requested) {
-        File metadataFile = repository.getFile(requested);
-
-        if (!metadataFile.getName().equals("maven-metadata.xml")) {
+    public Result<String, String> generateMetadata(IRepository repository, String[] requested) {
+        if (requested.length < 3 || !"maven-metadata.xml".equals(requested[requested.length-1]))
             return Result.error("Bad request");
-        }
+
+        File metadataFile = repository.getFile(requested);
 
         String cachedContent = metadataCache.get(metadataFile.getPath());
 
@@ -147,7 +149,7 @@ public final class MetadataService {
             metadataCache.put(metadataFile.getPath(), serializedMetadata);
             return Result.ok(serializedMetadata);
         } catch (IOException e) {
-            failureService.throwException(metadataFile.getAbsolutePath(), e);
+            errorHandler.accept(metadataFile.getAbsolutePath(), e);
             return Result.error("Cannot generate metadata");
         }
     }
@@ -164,6 +166,11 @@ public final class MetadataService {
 
     public int getCacheSize() {
         return metadataCache.size();
+    }
+
+    @Override
+    public void configure(Reposilite reposilite) {
+        reposilite.getConsole().registerCommand(new PurgeCommand(this));
     }
 
 }

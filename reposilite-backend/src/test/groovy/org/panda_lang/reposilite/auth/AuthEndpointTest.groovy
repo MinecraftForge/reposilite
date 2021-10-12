@@ -31,7 +31,7 @@ final class AuthEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @BeforeEach
     void generateToken() {
-        reposilite.getAuthService().createToken('/', 'admin', 'rwm', 'secret')
+        reposilite.getAuth().createToken('/', 'admin', 'rwm', 'secret')
     }
 
     @Test
@@ -50,13 +50,10 @@ final class AuthEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 200 and auth dto' () throws IOException {
-        def response = getAuthenticated('/api/auth', 'admin', 'secret')
-        assertEquals HttpStatus.SC_OK, response.getStatusCode()
-
-        def authDto = CdnFactory.createJson().load(response.parseAsString())
-        assertEquals 'rwm', authDto.getString('permissions').get()
-        assertEquals '/', authDto.getString('path').get()
-        assertEquals Arrays.asList('releases', 'snapshots'), authDto.getList('repositories', [])
+        def response = shouldReturnJson(HttpStatus.SC_OK, '/api/auth', 'admin', 'secret')
+        assertEquals 'rwm', response.getString('permissions').get()
+        assertEquals '/', response.getString('path').get()
+        assertEquals Arrays.asList('releases', 'snapshots'), response.getList('repositories', [])
     }
 
 }

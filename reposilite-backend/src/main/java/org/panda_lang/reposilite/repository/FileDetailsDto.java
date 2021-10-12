@@ -87,10 +87,12 @@ final class FileDetailsDto implements Serializable, Comparable<FileDetailsDto> {
         String date = StringUtils.EMPTY;
         String contentType = FilesUtils.getMimeType(file.getAbsolutePath(), "application/octet-stream");
 
-        try {
-            date = DATE_FORMAT.format(Files.getLastModifiedTime(file.toPath()).toMillis());
+        if (file.exists()) {
+            try {
+                date = DATE_FORMAT.format(Files.getLastModifiedTime(file.toPath()).toMillis());
+            }
+            catch (IOException ignored) { /* file does not exist */ }
         }
-        catch (IOException ignored) { /* file does not exist */ }
 
         return new FileDetailsDto(
                 file.isDirectory() ? DIRECTORY : FILE,

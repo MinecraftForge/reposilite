@@ -17,20 +17,85 @@
 package org.panda_lang.reposilite.config;
 
 import net.dzikoysk.cdn.Cdn;
-import net.dzikoysk.cdn.CdnFactory;
+import net.dzikoysk.cdn.CdnDeserializer;
+import net.dzikoysk.cdn.CdnSerializer;
+import net.dzikoysk.cdn.CdnSettings;
+import net.dzikoysk.cdn.features.DefaultFeature;
+import net.dzikoysk.cdn.model.Element;
+import net.dzikoysk.cdn.model.Section;
+import net.dzikoysk.cdn.serialization.Composer;
+
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteConstants;
+import org.panda_lang.reposilite.config.Configuration.Repository;
 import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.utilities.commons.ClassUtils;
 import org.panda_lang.utilities.commons.FileUtils;
 import org.panda_lang.utilities.commons.StringUtils;
 
 import java.io.File;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
 
 public final class ConfigurationLoader {
+
+    public static Cdn createCdn() {
+        Predicate<Class<?>> test = cls -> {
+            try {
+                cls.getConstructor(); // Has default constructor, should we add anymore checks?
+                return true;
+            } catch (NoSuchMethodException | SecurityException e) {
+                return false;
+            }
+        };
+        Composer<?> comp = new Composer<Object>() {
+            @Override
+            public Element<?> serialize(CdnSettings settings, List<String> description, String key, AnnotatedType type, Object entry) throws Exception {
+                Element<?> ret = new CdnSerializer(settings).serialize(entry);
+                if (key == null || key.isEmpty())
+                    return ret;
+                Section sec = new Section(description, key);
+                sec.append(ret);
+                return sec;
+            }
+
+            @Override
+            public Object deserialize(CdnSettings settings, Element<?> source, AnnotatedType type, Object defaultValue, boolean entryAsRecord) throws Exception {
+                if (!(source instanceof Section)) {
+                    throw new UnsupportedOperationException("Unsupported object source: " + source.getClass());
+                }
+                Class<?> clz = toClass(type.getType());
+                @SuppressWarnings("unchecked")
+                Object ret = new CdnDeserializer<Object>(settings).deserialize((Class<Object>)clz, (Section)source);
+                return ret;
+            }
+        };
+        return Cdn.configure()
+            .withDynamicComposer(test, comp)
+            .installFeature(new DefaultFeature())
+            .build();
+    }
+
+    public static Class<?> toClass(Type type) {
+        if (type instanceof ParameterizedType) {
+            return toClass(((ParameterizedType)type).getRawType());
+        }
+
+        try {
+            return Class.forName(type.getTypeName());
+        }
+        catch (ClassNotFoundException classNotFoundException) {
+            throw new IllegalArgumentException("Cannot find generic type " + type);
+        }
+    }
 
     public static Configuration tryLoad(String customConfigurationFile, String workingDirectory) {
         try {
@@ -49,22 +114,23 @@ public final class ConfigurationLoader {
             throw new IllegalArgumentException("Custom configuration file does not have '.cdn' extension");
         }
 
-        Cdn cdn = CdnFactory.createStandard();
+        Cdn cdn = createCdn();
 
         Configuration configuration = configurationFile.exists()
             ? cdn.load(configurationFile, Configuration.class)
             : new Configuration();
 
-        verifyBasePath(configuration);
-        verifyProxied(configuration);
+
+        sanitize(configuration);
         FileUtils.overrideFile(configurationFile, cdn.render(configuration));
-        loadProperties(configuration);
+        loadProperties("reposilite", configuration);
+        sanitize(configuration);
 
         return configuration;
     }
 
-    private static void verifyBasePath(Configuration configuration) {
-        String basePath = configuration.basePath;
+    private static void sanitize(Configuration config) {
+        String basePath = config.basePath;
 
         if (!StringUtils.isEmpty(basePath)) {
             if (!basePath.startsWith("/")) {
@@ -75,29 +141,62 @@ public final class ConfigurationLoader {
                 basePath += "/";
             }
 
-            configuration.basePath = basePath;
+            config.basePath = basePath;
         }
-    }
 
-    private static void verifyProxied(Configuration configuration) {
-        for (int index = 0; index < configuration.proxied.size(); index++) {
-            String proxied = configuration.proxied.get(index);
+        for (Repository repo : config.repositories.values()) {
+            for (int index = 0; index < repo.proxies.size(); index++) {
+                String proxy = repo.proxies.get(index);
 
-            if (proxied.endsWith("/")) {
-                configuration.proxied.set(index, proxied.substring(0, proxied.length() - 1));
+                if (!proxy.endsWith("/")) {
+                    repo.proxies.set(index, proxy + '/');
+                }
             }
         }
     }
 
-    private static void loadProperties(Configuration configuration) {
-        for (Field declaredField : configuration.getClass().getDeclaredFields()) {
-            String custom = System.getProperty("reposilite." + declaredField.getName());
+    @SuppressWarnings("unchecked")
+    private static void loadProperties(String prefix, Object inst) {
+        for (Field declaredField : inst.getClass().getDeclaredFields()) {
+            String custom = System.getProperty(prefix + '.' + declaredField.getName());
+            Class<?> type = ClassUtils.getNonPrimitiveClass(declaredField.getType());
+
+            if (Map.class.isAssignableFrom(type)) {
+                Map<Object, Object> map = null;
+                try {
+                    map = (Map<Object, Object>)declaredField.get(inst);
+                } catch (IllegalArgumentException | IllegalAccessException e) {
+                    throw new RuntimeException("Cannot modify configuration value", e);
+                }
+                if (!StringUtils.isEmpty(custom)) {
+                    map.clear();
+                    if (!"{}".equals(custom)) { // System.setProperty doesn't like setting to a empty value, so allow '{}' to define a empty map
+                        if (!(declaredField.getGenericType() instanceof ParameterizedType)) {
+                            throw new RuntimeException("Cannot modify configuration value, could not find map type " + declaredField.getDeclaringClass() + '.' + declaredField.getName());
+                        }
+                        Type valueType = ((ParameterizedType)declaredField.getGenericType()).getActualTypeArguments()[1];
+                        Class<?> valueClz = toClass(valueType);
+
+                        for (Object name : custom.split(",")) {
+                            try {
+                                map.put(name, (Object)valueClz.getConstructor().newInstance());
+                            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                                    | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+                                throw new RuntimeException("Cannot modify configuration value, could not instantiate type", e);
+                            }
+                        }
+                    }
+                }
+                for (Object key : map.keySet()) {
+                    loadProperties(prefix + '.' + declaredField.getName() + '.' + key, map.get(key));
+                }
+                continue;
+            }
 
             if (StringUtils.isEmpty(custom)) {
                 continue;
             }
 
-            Class<?> type = ClassUtils.getNonPrimitiveClass(declaredField.getType());
             Object customValue;
 
             if (String.class == type) {
@@ -118,7 +217,7 @@ public final class ConfigurationLoader {
             }
 
             try {
-                declaredField.set(configuration, customValue);
+                declaredField.set(inst, customValue);
             } catch (IllegalAccessException e) {
                 throw new RuntimeException("Cannot modify configuration value", e);
             }

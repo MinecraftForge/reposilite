@@ -27,11 +27,11 @@ class RevokeCommandTest extends ReposiliteTestSpecification {
 
     @Test
     void 'should revoke existing token' () {
-        def tokenService = reposilite.getAuthService().getAuthenticator().getTokenService()
-        tokenService.addToken(new Token('path', 'alias', 'rw', 'secret'))
+        def tokenService = reposilite.getAuth()
+        tokenService.createToken('path', 'alias', 'rw', 'secret')
 
         assertTrue executeCommand('revoke alias')
-        assertTrue tokenService.getToken('alias').isEmpty()
+        assertNull tokenService.getToken('alias')
     }
 
     @Test
@@ -41,7 +41,7 @@ class RevokeCommandTest extends ReposiliteTestSpecification {
 
     @Test
     void shouldFalseIfFileIsNotAvailable() throws Exception {
-        super.reposilite.getAuthService().getAuthenticator().getTokenService().addToken(new Token('path', 'alias', 'rw', 'secret'))
+        super.reposilite.getAuth().createToken('path', 'alias', 'rw', 'secret')
 
         executeOnLocked(new File(super.workingDirectory, 'tokens.dat'), {
             assertFalse executeCommand('revoke alias')

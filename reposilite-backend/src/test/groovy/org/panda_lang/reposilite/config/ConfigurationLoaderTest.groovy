@@ -37,14 +37,14 @@ class ConfigurationLoaderTest {
             System.setProperty("reposilite.hostname", "localhost")          // String type
             System.setProperty("reposilite.port", "8080")                   // Integer type
             System.setProperty("reposilite.debugEnabled", "true")           // Boolean type
-            System.setProperty("reposilite.proxied", "http://a.com,b.com")  // List<String> type
+            System.setProperty("reposilite.repositories.releases.proxies", "http://a.com,b.com")  // List<String> type
             System.setProperty("reposilite.repositories", " ")              // Skip empty
 
             def configuration = ConfigurationLoader.tryLoad("", workingDirectory.getAbsolutePath())
             assertEquals "localhost", configuration.hostname
             assertEquals 8080, configuration.port
             assertTrue configuration.debugEnabled
-            assertEquals Arrays.asList("http://a.com", "b.com"), configuration.proxied
+            assertEquals Arrays.asList("http://a.com/", "b.com/"), configuration.repositories.get('releases').proxies
             assertFalse configuration.repositories.isEmpty()
         }
         finally {
@@ -52,7 +52,7 @@ class ConfigurationLoaderTest {
             System.clearProperty("reposilite.hostname")
             System.clearProperty("reposilite.port")
             System.clearProperty("reposilite.debugEnabled")
-            System.clearProperty("reposilite.proxied")
+            System.clearProperty("reposilite.repositories.releases.proxies")
             System.clearProperty("reposilite.repositories")
         }
 
@@ -63,7 +63,7 @@ class ConfigurationLoaderTest {
     @Test
     void 'should load custom config' () {
         def customConfig = new File(workingDirectory, "random.cdn")
-        CdnFactory.createStandard().render(new Configuration(), customConfig)
+        ConfigurationLoader.createCdn().render(new Configuration(), customConfig)
         FileUtils.overrideFile(customConfig, FileUtils.getContentOfFile(customConfig).replace("port: 80", "port: 7"))
 
         def configuration = ConfigurationLoader.tryLoad(customConfig.getAbsolutePath(), workingDirectory.getAbsolutePath())
@@ -73,22 +73,20 @@ class ConfigurationLoaderTest {
     @Test
     void 'should not load other file types' () {
         def customConfig = new File(workingDirectory, "random.properties")
-        CdnFactory.createStandard().render(new Configuration(), customConfig)
+        ConfigurationLoader.createCdn().render(new Configuration(), customConfig)
         assertThrows RuntimeException.class, { ConfigurationLoader.load(customConfig.getAbsolutePath(), workingDirectory.getAbsolutePath()) }
     }
 
     @Test
     void 'should verify proxied' () {
-        def config = new File(workingDirectory, "config.cdn")
-        FileUtils.overrideFile(config, Joiner.on("\n").join(
-                "proxied [",
-                "  https://without.slash",
-                "  https://with.slash/",
-                "]"
-        ).toString())
-
-        def configuration = ConfigurationLoader.tryLoad(config.getAbsolutePath(), workingDirectory.getAbsolutePath())
-        assertEquals(Arrays.asList("https://without.slash", "https://with.slash"), configuration.proxied)
+        try {
+            System.setProperty("reposilite.repositories.snapshots.proxies", "https://without.slash,https://with.slash/")
+            def config = new File(workingDirectory, "config.cdn")
+            def configuration = ConfigurationLoader.tryLoad(config.getAbsolutePath(), workingDirectory.getAbsolutePath())
+            assertEquals Arrays.asList("https://without.slash/", "https://with.slash/"), configuration.repositories.get('snapshots').proxies
+        } finally {
+            System.clearProperty("reposilite.repositories.snapshots.proxies")
+        }
     }
 
 }

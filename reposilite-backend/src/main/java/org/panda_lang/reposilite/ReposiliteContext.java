@@ -16,9 +16,15 @@
 
 package org.panda_lang.reposilite;
 
+import org.panda_lang.reposilite.auth.IAuthManager;
+import org.panda_lang.reposilite.repository.IRepository;
+import org.panda_lang.reposilite.repository.IRepositoryManager;
+import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.ThrowingConsumer;
 import org.panda_lang.utilities.commons.function.ThrowingSupplier;
+
+import io.javalin.http.Context;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,26 +32,72 @@ import java.io.OutputStream;
 import java.util.Map;
 
 public final class ReposiliteContext {
+    public static ReposiliteContext create(IAuthManager auth, IRepositoryManager repos, String ipHeader, Context context) {
+        String realIp = context.header(ipHeader);
+        String address = StringUtils.isEmpty(realIp) ? context.req.getRemoteAddr() : realIp;
+
+        String uri = context.req.getRequestURI();
+        if (uri.startsWith("/api/"))
+            uri = uri.substring(5);
+        else if (uri.equals("/api"))
+            uri = "";
+        String normalized = ReposiliteUtils.normalizeUri(repos, uri).getOrNull();
+
+        //TODO: check auth and only list repos we have access to
+        IRepository repo = null;
+        String filepath = null;
+        if (normalized != null) {
+            int idx = normalized.indexOf('/');
+            if (idx != -1) {
+                repo = repos.getRepo(normalized.substring(0, idx));
+                filepath = normalized.substring(idx + 1);
+            }
+        }
+
+        return new ReposiliteContext(
+            context.req.getRequestURI(),
+            normalized,
+            filepath,
+            context.method(),
+            address,
+            context.headerMap(),
+            context.req::getInputStream,
+            repo,
+            auth
+        );
+    }
 
     private final String uri;
+    private final String normalized;
+    private final String filepath;
     private final String method;
     private final String address;
     private final Map<String, String> header;
     private final ThrowingSupplier<InputStream, IOException> input;
+    private final IRepository repo;
+    private final IAuthManager auth;
     private ThrowingConsumer<OutputStream, IOException> result;
 
-    public ReposiliteContext(
+    private ReposiliteContext(
             String uri,
+            String normalized,
+            String filepath,
             String method,
             String address,
             Map<String, String> header,
-            ThrowingSupplier<InputStream, IOException> input) {
+            ThrowingSupplier<InputStream, IOException> input,
+            IRepository repo,
+            IAuthManager auth) {
 
         this.uri = uri;
+        this.normalized = normalized;
+        this.filepath = filepath;
         this.method = method;
         this.address = address;
         this.header = header;
         this.input = input;
+        this.repo = repo;
+        this.auth = auth;
     }
 
     public void result(ThrowingConsumer<OutputStream, IOException> result) {
@@ -76,4 +128,19 @@ public final class ReposiliteContext {
         return uri;
     }
 
+    public String normalized() {
+        return normalized;
+    }
+
+    public String filepath() {
+        return filepath;
+    }
+
+    public IRepository repo() {
+        return repo;
+    }
+
+    public IAuthManager auth() {
+        return auth;
+    }
 }

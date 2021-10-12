@@ -19,54 +19,43 @@ package org.panda_lang.reposilite.repository;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteUtils;
-import org.panda_lang.reposilite.auth.AuthService;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataService;
-import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
 import java.util.concurrent.CompletableFuture;
 
-public final class DeployService {
-
-    private final boolean deployEnabled;
-    private final boolean rewritePathsEnabled;
-    private final AuthService auth;
-    private final RepositoryService repositoryService;
+final class DeployService {
+    private final IRepositoryManager repos;
     private final MetadataService metadataService;
 
     public DeployService(
-            boolean deployEnabled,
-            boolean rewritePathsEnabled,
-            AuthService auth,
-            RepositoryService repositoryService,
+            IRepositoryManager repos,
             MetadataService metadataService) {
-
-        this.deployEnabled = deployEnabled;
-        this.rewritePathsEnabled = rewritePathsEnabled;
-        this.auth = auth;
-        this.repositoryService = repositoryService;
+        this.repos = repos;
         this.metadataService = metadataService;
     }
 
     public Result<CompletableFuture<Result<FileDetailsDto, ErrorDto>>, ErrorDto> deploy(ReposiliteContext context) {
-        if (!deployEnabled) {
-            return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Artifact deployment is disabled");
-        }
-
-        Option<String> uriValue = ReposiliteUtils.normalizeUri(rewritePathsEnabled, repositoryService, context.uri());
-
-        if (uriValue.isEmpty()) {
+        String uri = context.normalized();
+        if (uri == null) {
             return ResponseUtils.error(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path");
         }
 
-        String uri = uriValue.get();
-        Result<Session, String> authResult = this.auth.authByUri(context.headers(), uri);
+        IRepository repo = context.repo();
+        if (repo == null) {
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + uri);
+        }
+
+        if (repo.isReadOnly()) {
+            return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Artifact deployment is disabled");
+        }
+
+        Result<Session, String> authResult = context.auth().getSession(context.headers(), uri);
 
         if (authResult.isErr()) {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, authResult.getError());
@@ -78,11 +67,11 @@ public final class DeployService {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, "Cannot deploy artifact without write permission");
         }
 
-        if (!repositoryService.getDiskQuota().hasUsableSpace()) {
+        if (!repo.getQuota().notFull()) {
             return ResponseUtils.error(HttpStatus.SC_INSUFFICIENT_STORAGE, "Out of disk space");
         }
 
-        File file = repositoryService.getFile(uri);
+        File file = repo.getFile(context.filepath());
         FileDetailsDto fileDetails = FileDetailsDto.of(file);
 
         File metadataFile = new File(file.getParentFile(), "maven-metadata.xml");
@@ -90,16 +79,19 @@ public final class DeployService {
 
         Reposilite.getLogger().info("DEPLOY " + authResult.get().getAlias() + " successfully deployed " + file + " from " + context.address());
 
+        //TODO: Remove this when we remove metadata service
         if (file.getName().contains("maven-metadata")) {
             return Result.ok(CompletableFuture.completedFuture(Result.ok(fileDetails)));
         }
 
-        CompletableFuture<Result<FileDetailsDto, ErrorDto>> task = repositoryService.storeFile(
-                uri,
-                file,
-                context::input,
-                () -> fileDetails,
-                exception -> new ErrorDto(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Failed to upload artifact"));
+        //TODO: Design a better API for this, so we don't have to cast to internal types.
+        CompletableFuture<Result<FileDetailsDto, ErrorDto>> task = ((RepositoryManager)repos).storeFile(
+            uri,
+            repo,
+            context.filepath(),
+            context::input,
+            () -> fileDetails,
+            exception -> new ErrorDto(HttpStatus.SC_INTERNAL_SERVER_ERROR, "Failed to upload artifact"));
 
         return Result.ok(task);
     }

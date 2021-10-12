@@ -22,6 +22,7 @@ import picocli.CommandLine.Parameters;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 
 @Command(name = "revoke", description = "Revoke token")
 final class RevokeCommand implements ReposiliteCommand {
@@ -37,7 +38,7 @@ final class RevokeCommand implements ReposiliteCommand {
 
     @Override
     public boolean execute(List<String> response) {
-        return tokenService.deleteToken(alias)
+        return Optional.ofNullable(tokenService.deleteToken(alias))
                 .map(token -> {
                     try {
                         tokenService.saveTokens();

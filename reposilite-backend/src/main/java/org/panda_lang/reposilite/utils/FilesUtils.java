@@ -31,8 +31,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.CharacterIterator;
-import java.text.StringCharacterIterator;
+import java.text.DecimalFormat;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -44,6 +43,7 @@ public final class FilesUtils {
     private final static long KB_FACTOR = 1024;
     private final static long MB_FACTOR = 1024 * KB_FACTOR;
     private final static long GB_FACTOR = 1024 * MB_FACTOR;
+    private static final DecimalFormat NUMBER_FORMATTER = new DecimalFormat("#.##");
 
     private static final String[] READABLE_CONTENT = {
             ".xml",
@@ -65,12 +65,12 @@ public final class FilesUtils {
         }
     }
 
-    public static long displaySizeToBytesCount(String displaySize) {
-        Pattern pattern = Pattern.compile("([0-9]+)(([KkMmGg])[Bb])");
-        Matcher match = pattern.matcher(displaySize);
+    public static long displayToBytes(String display) {
+        Pattern pattern = Pattern.compile("([0-9]+)(([KkMmGg])*[Bb])");
+        Matcher match = pattern.matcher(display);
 
         if (!match.matches() || match.groupCount() != 3) {
-            return Long.parseLong(displaySize);
+            return Long.parseLong(display);
         }
 
         long value = Long.parseLong(match.group(1));
@@ -82,30 +82,23 @@ public final class FilesUtils {
                 return value * MB_FACTOR;
             case "KB":
                 return value * KB_FACTOR;
+            case "B":
+                return value;
             default:
                 throw new NumberFormatException("Wrong format");
         }
     }
 
-    // Source
-    // ~ https://stackoverflow.com/a/3758880/3426515
-    public static String humanReadableByteCount(long bytes) {
-        long absB = bytes == Long.MIN_VALUE ? Long.MAX_VALUE : Math.abs(bytes);
-
-        if (absB < 1024) {
-            return bytes + " B";
-        }
-
-        long value = absB;
-        CharacterIterator ci = new StringCharacterIterator("KMGTPE");
-
-        for (int i = 40; i >= 0 && absB > 0xfffccccccccccccL >> i; i -= 10) {
-            value >>= 10;
-            ci.next();
-        }
-
-        value *= Long.signum(bytes);
-        return String.format("%.1f %ciB", value / 1024.0, ci.current());
+    public static String bytesToDisplay(long value) {
+        if (value == Long.MAX_VALUE)
+            return "Unlimited";
+        if (value >= GB_FACTOR)
+            return NUMBER_FORMATTER.format(value / (float)GB_FACTOR) + "GB";
+        else if (value >= MB_FACTOR)
+            return NUMBER_FORMATTER.format(value / (float)MB_FACTOR) + "MB";
+        else if (value >= KB_FACTOR)
+            return NUMBER_FORMATTER.format(value / (float)KB_FACTOR) + "KB";
+        return Long.toString(value);
     }
 
     public static boolean isReadable(String name) {

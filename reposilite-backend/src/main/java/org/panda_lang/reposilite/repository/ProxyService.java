@@ -23,92 +23,66 @@ import com.google.api.client.http.HttpRequestFactory;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.IOUtils;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteException;
 import org.panda_lang.reposilite.error.ErrorDto;
-import org.panda_lang.reposilite.error.FailureService;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.utils.ArrayUtils;
-import org.panda_lang.utilities.commons.StringUtils;
-import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
 import java.net.SocketTimeoutException;
-import java.util.List;
+import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.function.BiConsumer;
 
-public final class ProxyService {
-
-    private final boolean storeProxied;
-    private final String proxiedStorageRepo;
-    private final boolean proxyPrivate;
+final class ProxyService {
     private final int proxyConnectTimeout;
     private final int proxyReadTimeout;
-    private final boolean rewritePathsEnabled;
-    private final List<? extends String> proxied;
     private final ExecutorService ioService;
-    private final RepositoryService repositoryService;
-    private final FailureService failureService;
+    private final IRepositoryManager repos;
+    private final BiConsumer<String, Exception> errorHandler;
     private final HttpRequestFactory httpRequestFactory;
 
     public ProxyService(
-            boolean storeProxied,
-            String proxiedStorageRepo,
-            boolean proxyPrivate,
+            IRepositoryManager repos,
             int proxyConnectTimeout,
             int proxyReadTimeout,
-            boolean rewritePathsEnabled,
-            List<? extends String> proxied,
             ExecutorService ioService,
-            FailureService failureService,
-            RepositoryService repositoryService) {
-
-        this.storeProxied = storeProxied;
-        this.proxiedStorageRepo = proxiedStorageRepo;
-        this.proxyPrivate = proxyPrivate;
+            BiConsumer<String, Exception> errorHandler) {
+        this.repos = repos;
         this.proxyConnectTimeout = proxyConnectTimeout;
         this.proxyReadTimeout = proxyReadTimeout;
-        this.rewritePathsEnabled = rewritePathsEnabled;
-        this.proxied = proxied;
         this.ioService = ioService;
-        this.repositoryService = repositoryService;
-        this.failureService = failureService;
+        this.errorHandler = errorHandler;
         this.httpRequestFactory = new NetHttpTransport().createRequestFactory();
     }
 
-    protected Result<CompletableFuture<Result<LookupResponse, ErrorDto>>, ErrorDto> findProxied(ReposiliteContext context) {
-        String uri = context.uri();
-        Repository repository = repositoryService.getPrimaryRepository();
-
-        // remove repository name if defined
-        for (Repository localRepository : repositoryService.getRepositories()) {
-            if (uri.startsWith("/" + localRepository.getName())) {
-                repository = localRepository;
-                uri = uri.substring(1 + localRepository.getName().length());
-                break;
-            }
-        }
-
-        if (!proxyPrivate && repository.isHidden()) {
-            return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Proxying is disabled in private repositories"));
-        }
+    Result<LookupResponse, ErrorDto> findProxied(ReposiliteContext context) {
+        String uri = context.filepath();
+        String[] requestedPath = uri.split("/");
 
         // /groupId/artifactId/<content>
-        if (StringUtils.countOccurrences(uri, "/") < 3) {
-            return Result.error(new ErrorDto(HttpStatus.SC_NON_AUTHORITATIVE_INFORMATION, "Invalid proxied request"));
+        if (requestedPath.length < 3) {
+            return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Invalid proxied request"));
         }
 
+        String filename = requestedPath[requestedPath.length - 1];
         String remoteUri = uri;
-        CompletableFuture<Result<LookupResponse, ErrorDto>> proxiedTask = new CompletableFuture<>();
+        Collection<String> proxies = context.repo().getProxies();
 
-        ioService.submit(() -> {
-            for (String proxied : proxied) {
+        if (proxies.isEmpty())
+            return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Artifact " + filename + " not found"));
+
+        Future<Result<LookupResponse, ErrorDto>> future = ioService.submit(() -> {
+            for (String proxied : proxies) { // TODO: Rewrite all this
                 try {
+                    // TODO: Check for HEAD request, so that a HEAD to us doesn't result in a full GET to them
                     HttpRequest remoteRequest = httpRequestFactory.buildGetRequest(new GenericUrl(proxied + remoteUri));
                     remoteRequest.setThrowExceptionOnExecuteError(false);
                     remoteRequest.setConnectTimeout(proxyConnectTimeout * 1000);
@@ -121,86 +95,82 @@ public final class ProxyService {
 
                     HttpHeaders headers = remoteResponse.getHeaders();
 
+                    //TODO: Detect 302 redirects to directory listing
                     if ("text/html".equals(headers.getContentType())) {
                         continue;
                     }
 
-                    long contentLength = Option.of(headers.getContentLength()).orElseGet(0L);
+                    long contentLength = headers.getContentLength() == null ? 0 : headers.getContentLength();
                     String[] path = remoteUri.split("/");
 
                     FileDetailsDto fileDetails = new FileDetailsDto(FileDetailsDto.FILE, ArrayUtils.getLast(path), "", remoteResponse.getContentType(), contentLength);
                     LookupResponse response = new LookupResponse(fileDetails);
 
                     if (context.method().equals("HEAD")) {
-                        return proxiedTask.complete(Result.ok(response));
+                        return Result.ok(response);
                     }
 
+                    /*
                     if (!storeProxied) {
                         context.result(outputStream -> IOUtils.copyLarge(remoteResponse.getContent(), outputStream));
                         return proxiedTask.complete(Result.ok(response));
                     }
+                    */
 
-                    return store(context, remoteUri, remoteResponse, response)
-                            .onEmpty(() -> proxiedTask.complete(Result.ok(response)))
-                            .peek(task -> task.thenAccept(proxiedTask::complete));
+                    return store(context, remoteUri, remoteResponse);
                 }
                 catch (Exception exception) {
                     String message = "Proxied repository " + proxied + " is unavailable due to: " + exception.getMessage();
                     Reposilite.getLogger().error(message);
 
                     if (!(exception instanceof SocketTimeoutException)) {
-                        failureService.throwException(remoteUri, new ReposiliteException(message, exception));
+                        errorHandler.accept(remoteUri, new ReposiliteException(message, exception));
                     }
                 }
             }
 
-            return proxiedTask.complete(ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Artifact not found in local and remote repository"));
+            return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Artifact not found in local and remote repository"));
         });
 
-        return Result.ok(proxiedTask);
+        try {
+            return future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            errorHandler.accept(remoteUri, e);
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Error while resolving proxied artifact");
+        }
     }
 
-    private Option<CompletableFuture<Result<LookupResponse, ErrorDto>>> store(ReposiliteContext context, String uri, HttpResponse remoteResponse, LookupResponse response) {
-        DiskQuota diskQuota = repositoryService.getDiskQuota();
+    private Result<LookupResponse, ErrorDto> store(ReposiliteContext context, String uri, HttpResponse remoteResponse) {
+        IQuota diskQuota = repos.getQuota();
 
-        if (!diskQuota.hasUsableSpace()) {
+        if (!diskQuota.notFull()) {
             Reposilite.getLogger().warn("Out of disk space - Cannot store proxied artifact " + uri);
-            return Option.none();
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Artifact not found in local and remote repository");
         }
 
-        String repositoryName = StringUtils.split(uri.substring(1), "/")[0]; // skip first path separator
-        Repository repository = repositoryService.getRepository(repositoryName);
+        IRepository repository = context.repo();
 
-        if (this.proxiedStorageRepo != null && !this.proxiedStorageRepo.isEmpty()) {
-            if (repository != null) { // This *would* be nessasary but this function is never called with a repo prefixed name, and thus all files get proxied into the main repo...
-                uri = '/' + this.proxiedStorageRepo + uri.substring(repositoryName.length() + 1);
-            } else {
-                uri = '/' + this.proxiedStorageRepo + uri;
-            }
-            repository = repositoryService.getRepository(this.proxiedStorageRepo);
+        //TODO: Design a better API for this, so we don't have to cast to internal types.
+        CompletableFuture<Result<LookupResponse, ErrorDto>> future = ((RepositoryManager)repos).storeFile(
+            uri,
+            repository,
+            context.filepath(),
+            remoteResponse::getContent,
+            () -> {
+                File file = repository.getFile(context.filepath());
+                Reposilite.getLogger().info("Stored proxied " + context.filepath() + " in " + repository + " from " + remoteResponse.getRequest().getUrl());
+                context.result(outputStream -> FileUtils.copyFile(file, outputStream));
+                return new LookupResponse(FileDetailsDto.of(file));
+            },
+            exception -> new ErrorDto(HttpStatus.SC_UNPROCESSABLE_ENTITY, "Cannot process artifact")
+        );
+
+        try {
+            return future.get();
+        } catch (InterruptedException | ExecutionException e) {
+            errorHandler.accept(uri, e);
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Error while resolving proxied artifact");
         }
-
-        if (repository == null) {
-            if (!rewritePathsEnabled) {
-                Option.none();
-            }
-
-            uri = repositoryService.getPrimaryRepository().getName() + uri;
-        }
-
-        File proxiedFile = repositoryService.getFile(uri);
-
-        return Option.of(repositoryService.storeFile(
-                uri,
-                proxiedFile,
-                remoteResponse::getContent,
-                () -> {
-                    Reposilite.getLogger().info("Stored proxied " + proxiedFile + " from " + remoteResponse.getRequest().getUrl());
-                    context.result(outputStream -> FileUtils.copyFile(proxiedFile, outputStream));
-                    return response;
-                },
-                exception -> new ErrorDto(HttpStatus.SC_UNPROCESSABLE_ENTITY, "Cannot process artifact")));
-
     }
 
 }

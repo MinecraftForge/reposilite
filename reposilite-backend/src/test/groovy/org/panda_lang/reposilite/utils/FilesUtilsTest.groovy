@@ -28,10 +28,19 @@ final class FilesUtilsTest {
 
     @Test
     void 'should convert display size to bytes count' () {
-        assertEquals 1024, FilesUtils.displaySizeToBytesCount("1024")
-        assertEquals 1024, FilesUtils.displaySizeToBytesCount("1kb")
-        assertEquals 1024 * 1024, FilesUtils.displaySizeToBytesCount("1mb")
-        assertEquals 1024 * 1024 * 1024, FilesUtils.displaySizeToBytesCount("1gb")
+        assertEquals 1024, FilesUtils.displayToBytes("1024")
+        assertEquals 1024, FilesUtils.displayToBytes("1024B")
+        assertEquals 1024, FilesUtils.displayToBytes("1kb")
+        assertEquals 1024 * 1024, FilesUtils.displayToBytes("1mb")
+        assertEquals 1024 * 1024 * 1024, FilesUtils.displayToBytes("1gb")
+    }
+
+    @Test
+    void 'should convert bytes to display' () {
+        assertEquals "1023", FilesUtils.bytesToDisplay(1023)
+        assertEquals "1KB", FilesUtils.bytesToDisplay(1024)
+        assertEquals "1MB", FilesUtils.bytesToDisplay(1024 * 1024)
+        assertEquals "1GB", FilesUtils.bytesToDisplay(1024 * 1024 * 1024)
     }
 
     @Test

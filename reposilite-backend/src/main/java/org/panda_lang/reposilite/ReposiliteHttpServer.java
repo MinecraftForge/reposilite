@@ -19,17 +19,20 @@ package org.panda_lang.reposilite;
 import io.javalin.Javalin;
 import io.javalin.core.JavalinConfig;
 import io.javalin.core.JavalinServer;
+import io.javalin.http.Handler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
+import org.panda_lang.reposilite.IJavalinComponent.IJavalinContext;
+import org.panda_lang.reposilite.auth.IAuthManager;
+import org.panda_lang.reposilite.auth.IAuthedHandler;
 import org.panda_lang.reposilite.config.Configuration;
 import org.panda_lang.reposilite.console.CliController;
 import org.panda_lang.reposilite.console.RemoteExecutionEndpoint;
 import org.panda_lang.reposilite.error.FailureHandler;
-import org.panda_lang.reposilite.repository.DeployEndpoint;
-import org.panda_lang.reposilite.repository.LookupApiEndpoint;
-import org.panda_lang.reposilite.repository.LookupController;
+import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.reposilite.resource.FrontendHandler;
+import org.panda_lang.reposilite.resource.FrontendProvider;
 import org.panda_lang.utilities.commons.function.Option;
 
 public final class ReposiliteHttpServer {
@@ -41,54 +44,42 @@ public final class ReposiliteHttpServer {
         this.reposilite = reposilite;
     }
 
-    void start(Configuration configuration, Runnable onStart) {
-        DeployEndpoint deployEndpoint = new DeployEndpoint(reposilite.getContextFactory(), reposilite.getDeployService());
+    void start(Configuration config, Runnable onStart) {
+        FrontendProvider frontend = FrontendProvider.load(config, reposilite.getWorkingDirectory());
 
-        LookupController lookupController = new LookupController(
-                configuration.proxied.size() > 0,
-                reposilite.getContextFactory(),
-                reposilite.getFrontendService(),
-                reposilite.getLookupService(),
-                reposilite.getProxyService(),
-                reposilite.getFailureService());
+        this.javalin = create(config)
+            .before(ctx -> reposilite.getStatsService().record(ctx.req.getRequestURI()))
+            .get("/js/app.js", new FrontendHandler(frontend));
 
-        this.javalin = create(configuration)
-                .before(ctx -> reposilite.getStatsService().record(ctx.req.getRequestURI()))
-                .get("/js/app.js", new FrontendHandler(reposilite));
+        IJavalinContext jctx = new IJavalinContext() {
+            @Override public Javalin javalin() { return javalin; }
+            @Override public boolean apiEnabled() { return config.apiEnabled; }
+            @Override public Handler authedToHandler(IAuthedHandler child) {
+                return ctx -> child.handle(ctx, ReposiliteContext.create(auth(), repos(), config.forwardedIp, ctx));
+            }
+            @Override public IAuthManager auth() { return reposilite.getAuth(); }
+            @Override public IRepositoryManager repos() { return reposilite.getRepos(); }
+            @Override public FrontendProvider frontend() { return frontend; }
+            @Override public Configuration config() { return config; }
+        };
 
-        reposilite.getAuthService().register(configuration, this.javalin);
-
-        if (configuration.apiEnabled) {
-            LookupApiEndpoint lookupApiEndpoint = new LookupApiEndpoint(
-                    configuration.rewritePathsEnabled,
-                    configuration.apiRequiresAuth,
-                    reposilite.getContextFactory(),
-                    reposilite.getRepositoryAuthenticator(),
-                    reposilite.getRepositoryService());
-
-
+        reposilite.getAuth().register(jctx);
+        if (config.apiEnabled) {
             CliController cliController = new CliController(
-                    reposilite.getContextFactory(),
-                    reposilite.getExecutor(),
-                    reposilite.getAuthService(),
-                    reposilite.getConsole());
+                config.forwardedIp,
+                reposilite.getExecutor(),
+                reposilite.getAuth(),
+                reposilite.getConsole());
 
             this.javalin
-                .post("/api/execute", new RemoteExecutionEndpoint(reposilite.getAuthService(), reposilite.getContextFactory(), reposilite.getConsole()))
-                .ws("/api/cli", cliController)
-                .get("/api", lookupApiEndpoint)
-                .get("/api/*", lookupApiEndpoint);
+                .post("/api/execute", jctx.authedToHandler(new RemoteExecutionEndpoint(reposilite.getAuth(), reposilite.getConsole())))
+                .ws("/api/cli", cliController);
         }
+        reposilite.getRepos().register(jctx);
 
+        this.javalin.exception(Exception.class, new FailureHandler(reposilite.getFailureService()));
 
-        this.javalin
-            .get("/*", lookupController)
-            .head("/*", lookupController)
-            .put("/*", deployEndpoint)
-            .post("/*", deployEndpoint)
-            .exception(Exception.class, new FailureHandler(reposilite.getFailureService()));
-
-        javalin.start(configuration.hostname, configuration.port);
+        javalin.start(config.hostname, config.port);
         onStart.run();
     }
 

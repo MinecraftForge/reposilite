@@ -17,10 +17,15 @@
 package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
+
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-
+import org.panda_lang.utilities.commons.FileUtils
+import java.nio.channels.FileChannel
+import java.nio.file.OpenOption
+import java.nio.file.StandardOpenOption
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -28,31 +33,72 @@ import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-import static org.junit.jupiter.api.Assertions.assertEquals
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 class RepositoryStorageTest {
-
     @TempDir
-    protected File temp
+    protected static File WORKING_DIRECTORY
+    private static RepositoryManager REPOSITORY_MANAGER
 
-    private RepositoryStorage repositoryStorage
-
-    @BeforeEach
-    void setUp() {
-        ExecutorService ioService = new ThreadPoolExecutor(0, Integer.MAX_VALUE, 1, TimeUnit.SECONDS, new SynchronousQueue<>())
-        ScheduledExecutorService retryService = Executors.newSingleThreadScheduledExecutor()
-        repositoryStorage = new RepositoryStorage(temp, "100%", ioService, retryService)
+    @BeforeAll
+    static void prepare() {
+        REPOSITORY_MANAGER = (RepositoryManager)IRepositoryManager.builder()
+            .dir(WORKING_DIRECTORY)
+            .quota('0')
+            .executor(new ThreadPoolExecutor(0, Integer.MAX_VALUE, 1, TimeUnit.SECONDS, new SynchronousQueue<>()))
+            .scheduled(Executors.newSingleThreadScheduledExecutor())
+            .repo("releases", {})
+            .repo("snapshots", {})
+            .build()
     }
 
     @Test
     void 'should add size of written file to the disk quota'() {
-        def initialUsage = repositoryStorage.diskQuota.usage
-        def string = "test"
+        def releases = REPOSITORY_MANAGER.getRepo('releases')
+        def initialUsage = REPOSITORY_MANAGER.quota.usage
+        def string = 'test'
         def expectedUsage = initialUsage + string.bytes.length
 
-        repositoryStorage.storeFile(new ByteArrayInputStream(string.bytes), new File(temp, "file"))
+        REPOSITORY_MANAGER.@storage.storeFile(stream(string), releases, 'file')
 
-        assertEquals expectedUsage, repositoryStorage.diskQuota.usage
+        assertEquals expectedUsage, REPOSITORY_MANAGER.quota.usage
+    }
+
+    /* This test never worked because locks are JVM wide, so we would share it.
+     * This is to resolve multiple reposilite JVMs using the same backend data storage
+     * https://github.com/dzikoysk/reposilite/commit/9dd20174bf09dcc201696dd7e142d4eb3862f975
+     * Honestly, I dont think this is something we care about for the time being, so we'll address it later.
+    @Test
+    void 'should retry deployment of locked file' () {
+        def releases = REPOSITORY_MANAGER.getRepo('releases')
+        def storage = REPOSITORY_MANAGER.@storage
+        def content = 'new content'
+        def path = 'a/b/c.txt'
+
+        def file = releases.getFile(path)
+        file.getParentFile().mkdirs()
+        FileUtils.overrideFile(file, 'test')
+
+        def channel = FileChannel.open(file.toPath(), [ StandardOpenOption.WRITE ] as OpenOption[])
+        def lock = channel.lock()
+
+        def start = System.currentTimeMillis()
+        new Thread({
+            Thread.sleep(1000L)
+            lock.release()
+        }).start()
+
+        def ret = storage.storeFile(stream(content), releases, path)
+        def end = System.currentTimeMillis()
+        def read = file.text
+        //System.out.println("Time: " + start + " " + end + " " + (end - start))
+        assertEquals content, read
+        assertTrue end - start >= 1000, 'Stored file too fast'
+    }
+    */
+
+    private static InputStream stream(String data) {
+        return new ByteArrayInputStream(data.bytes)
     }
 }
