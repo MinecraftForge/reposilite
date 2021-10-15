@@ -55,7 +55,11 @@ final class DeployService {
             return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Artifact deployment is disabled");
         }
 
-        Result<Session, String> authResult = context.auth().getSession(context.headers(), uri);
+        if (!repo.canContain(context.filepath())) {
+            return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Repository " + repo.getName() + " can not contain: " + context.filepath());
+        }
+
+        Result<Session, String> authResult = context.session(uri);
 
         if (authResult.isErr()) {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, authResult.getError());

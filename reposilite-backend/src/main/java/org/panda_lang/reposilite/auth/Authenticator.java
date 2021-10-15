@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 final class Authenticator {
+    private final boolean DEBUG = false;
     private final IRepositoryManager repos;
     private final TokenService tokenService;
     TokenService getTokenService() { return this.tokenService; }
@@ -42,37 +43,15 @@ final class Authenticator {
         this.tokenService = new TokenService(workingDirectory);
     }
 
-    public Result<Session, String> getSession(Map<String, String> header, String uri) {
-        Result<Session, String> authResult = authByHeader(header);
-        if (uri == null)
-            return authResult;
-
-        if (!uri.startsWith("/")) {
-            uri = "/" + uri;
-        }
-
-        if (authResult.isErr()) {
-            Reposilite.getLogger().debug(authResult.getError());
-            return authResult;
-        }
-
-        Session session = authResult.get();
-
-        if (!session.hasPermissionTo(uri)) {
-            return Result.error("Unauthorized access attempt");
-        }
-
-        Reposilite.getLogger().info("AUTH " + session.getToken().getAlias() + " accessed " + uri);
-        return authResult;
-    }
-
-    private Result<Session, String> authByHeader(Map<String, String> header) {
+    public Result<Session, String> getSession(Map<String, String> header) {
         String authorization = header.get("Authorization");
-        Reposilite.getLogger().debug("Header ---");
 
-        header.forEach((key, value) -> {
-            Reposilite.getLogger().debug(key + ": " + value);
-        });
+        if (DEBUG) {
+            Reposilite.getLogger().debug("Header ---");
+            header.forEach((key, value) -> {
+                Reposilite.getLogger().debug(key + ": " + value);
+            });
+        }
 
         if (authorization == null) {
             return Result.error("Authorization credentials are not specified");

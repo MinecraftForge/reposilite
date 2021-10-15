@@ -20,7 +20,6 @@ import org.apache.commons.io.FileUtils;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.auth.IAuthManager;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
@@ -34,17 +33,14 @@ import java.io.File;
 final class LookupService {
     private final MetadataService metadataService;
     private final IRepositoryManager repos;
-    private final IAuthManager auth;
     private final ProxyService proxy;
 
     LookupService(
             MetadataService metadataService,
             IRepositoryManager repos,
-            IAuthManager auth,
             ProxyService proxy) {
         this.metadataService = metadataService;
         this.repos = repos;
-        this.auth = auth;
         this.proxy = proxy;
     }
 
@@ -57,10 +53,13 @@ final class LookupService {
         IRepository repo = context.repo();
         if (repo == null)
             return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.normalized());
+        return findFile(context, repo);
+    }
 
+    private Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context, IRepository repo) {
         if (repo.isHidden()) {
-            Result<Session, String> auth = this.auth.getSession(context.headers(), uri);
-            if (auth.isErr() || !auth.get().hasPermissionTo('/' + uri) || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER))
+            Result<Session, String> auth = context.session('/' + repo.getName() + '/' + context.filepath());
+            if (auth.isErr() || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER))
                 return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, "Unauthorized request");
         }
 
@@ -101,7 +100,7 @@ final class LookupService {
         if (requestPath.length > 3 && requestedFileName.equals("maven-metadata.xml")) {
             Result<String, String> meta = metadataService.generateMetadata(repo, requestPath);
             if (meta.isErr())
-                return findProxy(context);
+                return findProxy(context, repo);
             else
                 return Result.ok(new LookupResponse("text/xml", meta.get()));
         }
@@ -134,7 +133,7 @@ final class LookupService {
             if ((requestPath.length == 3 && !"maven-metadata.xml".equals(requestPath[2])) && requestPath.length < 4)
                 return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Invalid artifact path");
             else
-                return findProxy(context);
+                return findProxy(context, repo);
         }
 
         if (file.isDirectory()) {
@@ -151,16 +150,12 @@ final class LookupService {
         return Result.ok(new LookupResponse(fileDetails));
     }
 
-    private Result<LookupResponse, ErrorDto> findProxy(ReposiliteContext context) {
-
-        /*
-        private void handleProxied(Context ctx, ReposiliteContext context, Result<CompletableFuture<Result<LookupResponse, ErrorDto>>, ErrorDto> response) {
-            response
-                .map(task -> task.thenAccept(result -> handleResult(ctx, context, result)))
-                .peek(ctx::result)
-                .onError(error -> handleError(ctx, error));
+    private Result<LookupResponse, ErrorDto> findProxy(ReposiliteContext context, IRepository repo) {
+        if (repo.getDelegate() != null) {
+            IRepository delegate = this.repos.getRepo(repo.getDelegate());
+            if (delegate != null)
+                return findFile(context, delegate);
         }
-        */
         return proxy.findProxied(context);
     }
 

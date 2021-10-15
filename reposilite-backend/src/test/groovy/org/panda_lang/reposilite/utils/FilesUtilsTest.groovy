@@ -55,4 +55,15 @@ final class FilesUtilsTest {
         } as Executable)
     }
 
+    @Test
+    void 'should trim string correctly' () {
+        assertEquals 'string', FilesUtils.trim('/string/', '/' as char)
+        assertEquals 'string', FilesUtils.trim('string/', '/' as char)
+        assertEquals 'string', FilesUtils.trim('///string/', '/' as char)
+        assertEquals 'string', FilesUtils.trim('string///', '/' as char)
+        assertEquals 'str/ing', FilesUtils.trim('///str/ing///', '/' as char)
+        assertEquals '', FilesUtils.trim('', '/' as char)
+        assertEquals '', FilesUtils.trim('////', '/' as char)
+    }
+
 }

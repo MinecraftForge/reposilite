@@ -4,6 +4,7 @@ plugins {
     id 'java'
     id 'groovy'
     id 'maven-publish'
+    id 'jacoco'
 }
 
 //group = 'org.panda-lang'
@@ -41,6 +42,12 @@ jar {
         )
     }
 }
+test {
+    useJUnitPlatform()
+    finalizedBy(jacocoTestReport)
+}
+
+jacocoTestReport.dependsOn(test)
 
 shadowJar {
     mergeServiceFiles()

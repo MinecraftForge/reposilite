@@ -24,7 +24,7 @@ public interface IAuthManager extends IJavalinComponent {
     @Deprecated //TODO: Properly encapsulate/limit the entry points?, Only used by CliController
     Result<Session, String> getSession(String creds);
     @Deprecated //TODO: Properly encapsulate/limit the entry points?
-    Result<Session, String> getSession(Map<String, String> headers, String url);
+    Result<Session, String> getSession(Map<String, String> headers);
 
     // Create a random password using a SecureRandom generator.
     String createRandomPassword();

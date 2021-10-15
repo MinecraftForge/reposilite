@@ -107,6 +107,11 @@ public final class Configuration {
     "#     # Files not found locally will be attempted to be found",
     "#     # in the following reposiories. And cached locally.",
     "#     proxies: []",
+    "#     # Repository name to delegate requests to, if this one does not ",
+    "#     # have the requested file. This can not be used with 'proxies'.",
+    "#     # This is mainly intended to allow proxied files to be stored in",
+    "#     # a seperate repo for organiztion.",
+    "#     delegate: \"\"",
     "#   }",
     "# }"
     })
@@ -122,5 +127,6 @@ public final class Configuration {
         public Boolean allowUploads = true;
         public String diskQuota = "";
         public List<String> proxies = Collections.emptyList();
+        public String delegate = "";
     }
 }

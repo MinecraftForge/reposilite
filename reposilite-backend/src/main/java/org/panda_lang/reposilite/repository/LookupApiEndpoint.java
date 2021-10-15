@@ -24,7 +24,6 @@ import io.javalin.plugin.openapi.annotations.OpenApiResponse;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.auth.IAuthManager;
 import org.panda_lang.reposilite.auth.IAuthedHandler;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
@@ -44,11 +43,9 @@ import java.util.stream.Collectors;
 
 final class LookupApiEndpoint implements IAuthedHandler {
     private final IRepositoryManager repos;
-    private final IAuthManager auth;
 
-    public LookupApiEndpoint(IRepositoryManager repos, IAuthManager auth) {
+    public LookupApiEndpoint(IRepositoryManager repos) {
         this.repos = repos;
-        this.auth = auth;
     }
 
     @OpenApi(
@@ -81,7 +78,7 @@ final class LookupApiEndpoint implements IAuthedHandler {
     )
     @Override
     public void handle(Context ctx, ReposiliteContext context) {
-        Reposilite.getLogger().info("API " + context.uri() + " from " + context.address());
+        //Reposilite.getLogger().info("API " + context.uri() + " from " + context.address());
 
         if (context.normalized() == null) {
             ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path"));
@@ -91,7 +88,7 @@ final class LookupApiEndpoint implements IAuthedHandler {
         String uri = context.normalized();
 
         if ("/".equals(uri) || StringUtils.isEmpty(uri)) {
-            Option<Session> session = auth.getSession(context.headers(), null).toOption();
+            Option<Session> session = context.session().toOption();
             List<IRepository> viewable = repos.getRepos().stream()
                 .filter(repo -> (repo.canBrowse() && !repo.isHidden()) || session.map(value -> value.getRepositories().contains(repo)).orElseGet(false))
                 .collect(Collectors.toList());
@@ -118,7 +115,7 @@ final class LookupApiEndpoint implements IAuthedHandler {
         }
 
         if (!repo.canBrowse() || repo.isHidden()) {
-            Result<Session, String> auth = this.auth.getSession(context.headers(), uri);
+            Result<Session, String> auth = context.session(uri);
             if (auth.isErr()) {
                 ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.getError());
                 return;

@@ -20,8 +20,6 @@ public interface IRepositoryManager extends IJavalinComponent {
      */
     void load();
 
-    @Deprecated // TODO: This is used to prefix the main repo, remove when I remove that concept
-    IRepository getPrimaryRepository();
     IRepository getRepo(String name);
     Collection<? extends IRepository> getRepos();
     IQuota getQuota();

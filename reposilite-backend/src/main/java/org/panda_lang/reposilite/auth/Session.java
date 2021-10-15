@@ -43,6 +43,9 @@ public final class Session {
     }
 
     public boolean hasPermissionTo(String path) {
+        if (!path.startsWith("/"))
+            path = '/' + path;
+
         String tokenPath = token.getPath();
 
         if (token.isWildcard()) {

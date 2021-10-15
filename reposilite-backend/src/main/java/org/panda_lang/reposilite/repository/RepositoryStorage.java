@@ -49,7 +49,7 @@ final class RepositoryStorage {
             Reposilite.getLogger().info("+ " + repo.getName() + (repo.isHidden() ? " (hidden)" : "") + " " + repo.getQuota());
         }
 
-        Reposilite.getLogger().info(manager.getRepos().size() + " repositories have been found");
+        Reposilite.getLogger().info(manager.getRepos().size() + " repositories have been found " + manager.getQuota());
     }
 
     CompletableFuture<File> storeFile(InputStream source, IRepository repo, String path) throws Exception {

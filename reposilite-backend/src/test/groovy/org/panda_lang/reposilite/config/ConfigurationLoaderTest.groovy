@@ -18,6 +18,8 @@ package org.panda_lang.reposilite.config
 
 import groovy.transform.CompileStatic
 import net.dzikoysk.cdn.CdnFactory
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.utilities.commons.FileUtils
@@ -27,65 +29,108 @@ import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 class ConfigurationLoaderTest {
-
     @TempDir
-    protected File workingDirectory
+    protected File WORKING_DIRECTORY
+
+    @BeforeEach
+    void before() {
+        cleanup()
+    }
+
+    @AfterEach
+    void cleanup() {
+        List<String> toClear = []
+        System.properties.keys().each { k ->
+            if (k instanceof String && k.startsWith('reposilite'))
+                toClear.add(k)
+        }
+        toClear.each { System.clearProperty(it) }
+    }
+
+    Configuration cfg(Map<String, String> props) {
+        props.each {k, v -> System.setProperty('reposilite.' + k, v) }
+        return ConfigurationLoader.tryLoad('', WORKING_DIRECTORY.getAbsolutePath())
+    }
 
     @Test
     void 'should load file with custom properties' () {
-        try {
-            System.setProperty("reposilite.hostname", "localhost")          // String type
-            System.setProperty("reposilite.port", "8080")                   // Integer type
-            System.setProperty("reposilite.debugEnabled", "true")           // Boolean type
-            System.setProperty("reposilite.repositories.releases.proxies", "http://a.com,b.com")  // List<String> type
-            System.setProperty("reposilite.repositories", " ")              // Skip empty
+        def conf = cfg([
+            'hostname':     'localhost',    // String type
+            'port':         '8080',         // Integer type
+            'debugEnabled': 'true',         // Boolean type
+            'repositories': ' ',            // Skip empty
+            'repositories.releases.proxies': 'http://a.com,b.com',  // List<String> type
+        ])
 
-            def configuration = ConfigurationLoader.tryLoad("", workingDirectory.getAbsolutePath())
-            assertEquals "localhost", configuration.hostname
-            assertEquals 8080, configuration.port
-            assertTrue configuration.debugEnabled
-            assertEquals Arrays.asList("http://a.com/", "b.com/"), configuration.repositories.get('releases').proxies
-            assertFalse configuration.repositories.isEmpty()
-        }
-        finally {
-            // Clean up the system properties to avoid loading of these values by the further tests
-            System.clearProperty("reposilite.hostname")
-            System.clearProperty("reposilite.port")
-            System.clearProperty("reposilite.debugEnabled")
-            System.clearProperty("reposilite.repositories.releases.proxies")
-            System.clearProperty("reposilite.repositories")
-        }
+        assertEquals "localhost", conf.hostname
+        assertEquals 8080, conf.port
+        assertTrue conf.debugEnabled
+        assertEquals Arrays.asList("http://a.com/", "b.com/"), conf.repositories.get('releases').proxies
+        assertFalse conf.repositories.isEmpty()
+    }
 
-        def configuration = ConfigurationLoader.tryLoad("", workingDirectory.getAbsolutePath())
-        assertEquals 80, configuration.port
+    @Test
+    void 'should load custom map entries' () {
+        def conf = cfg(['repositories': 'test'])
+        assertEquals 1, conf.repositories.size()
+        assertTrue conf.repositories.containsKey('test')
+    }
+
+    @Test
+    void 'should load empty map' () {
+        def conf = cfg(['repositories': '{}'])
+        assertTrue conf.repositories.isEmpty()
     }
 
     @Test
     void 'should load custom config' () {
-        def customConfig = new File(workingDirectory, "random.cdn")
-        ConfigurationLoader.createCdn().render(new Configuration(), customConfig)
-        FileUtils.overrideFile(customConfig, FileUtils.getContentOfFile(customConfig).replace("port: 80", "port: 7"))
+        def file = new File(WORKING_DIRECTORY, 'random.cdn')
+        ConfigurationLoader.createCdn().render(new Configuration(), file)
+        FileUtils.overrideFile(file, FileUtils.getContentOfFile(file).replace('port: 80', 'port: 7'))
 
-        def configuration = ConfigurationLoader.tryLoad(customConfig.getAbsolutePath(), workingDirectory.getAbsolutePath())
-        assertEquals 7, configuration.port
+        def conf = ConfigurationLoader.tryLoad(file.getAbsolutePath(), WORKING_DIRECTORY.getAbsolutePath())
+        assertEquals 7, conf.port
     }
 
     @Test
     void 'should not load other file types' () {
-        def customConfig = new File(workingDirectory, "random.properties")
-        ConfigurationLoader.createCdn().render(new Configuration(), customConfig)
-        assertThrows RuntimeException.class, { ConfigurationLoader.load(customConfig.getAbsolutePath(), workingDirectory.getAbsolutePath()) }
+        def file = new File(WORKING_DIRECTORY, 'random.properties')
+        ConfigurationLoader.createCdn().render(new Configuration(), file)
+        assertThrows RuntimeException.class, { ConfigurationLoader.load(file.getAbsolutePath(), WORKING_DIRECTORY.getAbsolutePath()) }
     }
 
     @Test
-    void 'should verify proxied' () {
-        try {
-            System.setProperty("reposilite.repositories.snapshots.proxies", "https://without.slash,https://with.slash/")
-            def config = new File(workingDirectory, "config.cdn")
-            def configuration = ConfigurationLoader.tryLoad(config.getAbsolutePath(), workingDirectory.getAbsolutePath())
-            assertEquals Arrays.asList("https://without.slash/", "https://with.slash/"), configuration.repositories.get('snapshots').proxies
-        } finally {
-            System.clearProperty("reposilite.repositories.snapshots.proxies")
+    void 'should sanitize proxies' () {
+        def config = cfg(['repositories.snapshots.proxies': 'https://without.slash,https://with.slash/'])
+        assertEquals Arrays.asList('https://without.slash/', 'https://with.slash/'), config.repositories.get('snapshots').proxies
+    }
+
+    @Test
+    void 'should sanitize prefixes' () {
+        def config = cfg(['repositories.snapshots.prefixes': 'without.slash,with.slash/,/with.extra.slash/'])
+        assertEquals Arrays.asList('without.slash/', 'with.slash/', 'with.extra.slash/'), config.repositories.get('snapshots').prefixes
+    }
+
+    @Test
+    void 'should sanitize base path' () {
+        def config = cfg(['basePath': 'noslash'])
+        assertEquals '/noslash/', config.basePath
+    }
+
+    @Test
+    void 'should error with proxy and delegate' () {
+        assertThrows IllegalStateException.class, {
+            cfg([
+                'repositories.releases.delegate': 'snapshots',
+                'repositories.releases.proxies':  'localhost'
+            ])
+        }
+    }
+
+    @Test
+    void 'should error with invalid delegate' () {
+        assertThrows IllegalStateException.class, {
+            cfg(['repositories.releases.delegate': 'unknown repo'])
         }
     }
 

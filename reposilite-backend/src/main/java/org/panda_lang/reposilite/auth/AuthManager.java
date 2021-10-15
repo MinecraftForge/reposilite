@@ -28,7 +28,7 @@ class AuthManager implements IAuthManager {
     public void register(IJavalinContext jctx) {
         if (jctx.apiEnabled()) {
             jctx.javalin().get("/api/auth", ctx -> {
-                getSession(ctx.headerMap(), null)
+                getSession(ctx.headerMap())
                 .map(session -> new AuthDto(session.getToken().getPath(), session.getToken().getPermissions(), session.getRepositoryNames()))
                 .mapErr(error -> new ErrorDto(HttpStatus.SC_UNAUTHORIZED, error))
                 .peek(ctx::json)
@@ -81,8 +81,8 @@ class AuthManager implements IAuthManager {
     }
 
     @Override
-    public Result<Session, String> getSession(Map<String, String> header, String uri) {
-        return this.auth.getSession(header, uri);
+    public Result<Session, String> getSession(Map<String, String> header) {
+        return this.auth.getSession(header);
     }
 
     @Override

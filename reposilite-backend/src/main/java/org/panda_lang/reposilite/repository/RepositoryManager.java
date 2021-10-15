@@ -61,11 +61,6 @@ class RepositoryManager implements IRepositoryManager {
     }
 
     @Override
-    public IRepository getPrimaryRepository() {
-        return this.repos.values().iterator().next();
-    }
-
-    @Override
     public IRepository getRepo(String name) {
         return this.repos.get(name);
     }
@@ -88,7 +83,7 @@ class RepositoryManager implements IRepositoryManager {
     @Override
     public void register(IJavalinContext jctx) {
         if (jctx.apiEnabled()) {
-            Handler lookupApiEndpoint = jctx.authedToHandler(new LookupApiEndpoint(this, jctx.auth()));
+            Handler lookupApiEndpoint = jctx.authedToHandler(new LookupApiEndpoint(this));
             jctx.javalin()
                 .get("/api", lookupApiEndpoint) // TODO: Kill this... We need to re-org the API to sane expandable formats.
                 .get("/api/*", lookupApiEndpoint);
@@ -97,7 +92,7 @@ class RepositoryManager implements IRepositoryManager {
         Handler deployEndpoint = jctx.authedToHandler(new DeployEndpoint(this.deployService));
 
         ProxyService proxyService = new ProxyService(this, jctx.config().proxyConnectTimeout, jctx.config().proxyReadTimeout, this.executor, this.errorHandler);
-        LookupService lookupService = new LookupService(metadataService, this, jctx.auth(), proxyService);
+        LookupService lookupService = new LookupService(metadataService, this, proxyService);
         Handler lookupController = jctx.authedToHandler(new LookupEndpoint(this, jctx.frontend(), lookupService, errorHandler));
 
         jctx.javalin()

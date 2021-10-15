@@ -43,25 +43,21 @@ abstract class ReposiliteIntegrationTestSpecification {
     public static final HttpRequestFactory REQUEST_FACTORY = new NetHttpTransport().createRequestFactory()
 
     @TempDir
-    protected File workingDirectory
+    protected File WORKING_DIRECTORY
     protected Map<String, String> properties = new HashMap<>()
     protected Reposilite reposilite
 
     @BeforeEach
     protected void before() {
-        System.setProperty("tinylog.writerFile.file", "target/log.txt")
+        System.setProperty('tinylog.writerFile.file', 'target/log.txt')
         ReposiliteWriter.clear()
-        reposilite = reposilite(workingDirectory)
+        reposilite = reposilite(WORKING_DIRECTORY)
         reposilite.launch()
     }
 
     protected Reposilite reposilite(File workingDirectory, String... args) {
-        return reposilite(PORT, workingDirectory, args)
-    }
-
-    protected Reposilite reposilite(String port, File workingDirectory, String... args) {
         FileUtils.copyDirectory(new File("src/test/workspace/repositories"), new File(workingDirectory, "repositories"))
-        System.setProperty("reposilite.port", port)
+        System.setProperty('reposilite.port', PORT)
         properties.forEach({ property, value -> System.setProperty(property, value) })
 
         try {
@@ -71,7 +67,7 @@ abstract class ReposiliteIntegrationTestSpecification {
             ))).orElseThrow({ new RuntimeException("Invalid test parameters") })
         }
         finally {
-            System.clearProperty("reposilite.port")
+            System.clearProperty('reposilite.port')
             properties.forEach({ key, value -> System.clearProperty(key) })
         }
     }

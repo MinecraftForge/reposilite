@@ -37,8 +37,9 @@ final class Repository implements IRepository {
     private final DiskQuota quota;
     private final List<String> proxies;
     private final List<String> prefixes;
+    private final String delegate;
 
-    private Repository(String name, File root, List<String> prefixes, boolean hidden, boolean readOnly, boolean browseable, DiskQuota quota, List<String> proxies) {
+    private Repository(String name, File root, List<String> prefixes, boolean hidden, boolean readOnly, boolean browseable, DiskQuota quota, List<String> proxies, String delegate) {
         this.name = name;
         this.root = root;
         this.prefixes = prefixes == null || prefixes.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(prefixes);
@@ -47,6 +48,7 @@ final class Repository implements IRepository {
         this.browseable = browseable;
         this.quota = quota;
         this.proxies = proxies == null || proxies.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(proxies);
+        this.delegate = delegate == null || delegate.trim().isEmpty() ? null : delegate.trim();
     }
 
     @Override
@@ -113,6 +115,27 @@ final class Repository implements IRepository {
         return this.proxies;
     }
 
+    @Override
+    public String getDelegate() {
+        return this.delegate;
+    }
+
+    @Override
+    public boolean canContain(String path) {
+        if (this.prefixes.isEmpty())
+            return true;
+
+        if (path == null || path.isEmpty())
+            return false;
+
+        for (String prefix : this.prefixes) {
+            if (path.startsWith(prefix))
+                return true;
+        }
+
+        return false;
+    }
+
     static class Builder implements IRepository.Builder {
         private final String name;
         private List<String> prefixes = new ArrayList<>();
@@ -121,6 +144,7 @@ final class Repository implements IRepository {
         private boolean browseable = true;
         protected String quota = null;
         private List<String> proxies = new ArrayList<>();
+        private String delegate = null;
         protected Supplier<File> directory;
 
         Builder(String name) {
@@ -148,7 +172,8 @@ final class Repository implements IRepository {
                 this.readOnly,
                 this.browseable,
                 getQuota(),
-                this.proxies
+                this.proxies,
+                this.delegate
             );
         }
 
@@ -201,6 +226,11 @@ final class Repository implements IRepository {
             this.directory = () -> new File(value, this.name);
             return this;
         }
-    }
 
+        @Override
+        public Builder delegate(String value) {
+            this.delegate = value;
+            return this;
+        }
+    }
 }

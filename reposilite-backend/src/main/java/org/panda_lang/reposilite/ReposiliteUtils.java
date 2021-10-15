@@ -16,6 +16,7 @@
 
 package org.panda_lang.reposilite;
 
+import org.panda_lang.reposilite.repository.IRepository;
 import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.utilities.commons.function.Option;
 
@@ -38,7 +39,7 @@ public final class ReposiliteUtils {
      *
      * TODO: Move to the context generator itself.
      */
-    public static Option<String> normalizeUri(IRepositoryManager repoManager, String uri) {
+    public static Option<String> normalizeUri(IRepositoryManager repos, String uri) {
         while (uri.startsWith("/")) {
             uri = uri.substring(1);
         }
@@ -53,10 +54,16 @@ public final class ReposiliteUtils {
         }
 
         String first = uri.substring(0, idx);
-        if (repoManager.getRepo(first) != null)
+        if (repos.getRepo(first) != null)
             return Option.of(uri);
 
-        return Option.of(repoManager.getPrimaryRepository().getName() + "/" + uri);
+        for (IRepository repo : repos.getRepos()) {
+            if (repo.canContain(uri))
+                return Option.of(repo.getName() + '/' + uri);
+        }
+
+        // If all else fails, fallback to the input uri
+        return Option.of(uri);
     }
 
 }

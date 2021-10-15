@@ -162,4 +162,17 @@ public final class FilesUtils {
         });
     }
 
+    public static String trim(String data, char chr) {
+        int start = -1;
+        while (++start < data.length() && data.charAt(start) == chr);
+        if (start != 0)
+            data = data.substring(start);
+
+        int end = data.length();
+        while (end > 0 && data.charAt(--end) == chr);
+        if (end != data.length())
+            data = data.substring(0, end + 1);
+        return data;
+    }
+
 }

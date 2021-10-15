@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.repository.IRepositoryManager
 import org.panda_lang.utilities.commons.collection.Maps
 
+import static org.junit.jupiter.api.Assertions.assertFalse
 import static org.junit.jupiter.api.Assertions.assertTrue
 
 import org.junit.jupiter.api.BeforeAll
@@ -63,17 +64,17 @@ class AuthenticatorTest {
 
     @Test
     void 'should not auth without authorization header' () {
-        assertTrue AUTH_MANAGER.getSession(Collections.emptyMap(), "auth/test").isErr()
+        assertTrue AUTH_MANAGER.getSession(Collections.emptyMap()).isErr()
     }
 
     @Test
     void 'should not auth using other auth method' () {
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", "Bearer " + AUTH_TOKEN.getToken()), "auth/test").isErr()
+        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", "Bearer " + AUTH_TOKEN.getToken())).isErr()
     }
 
     @Test
     void 'should not auth using invalid basic format' () {
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", "Basic"), "auth/test").isErr()
+        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", "Basic")).isErr()
     }
 
     @Test
@@ -98,22 +99,26 @@ class AuthenticatorTest {
     @Test
     void 'should auth' () {
         assertTrue AUTH_MANAGER.getSession("alias:secret").isOk()
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC), null).isOk()
+        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC)).isOk()
     }
 
     @Test
     void 'should auth context' () {
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC), "auth/test").isOk()
+        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC)).isOk()
     }
 
     @Test
     void 'should not auth invalid uri' () {
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC), "auth").isErr()
+        def auth = AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC))
+        assertTrue auth.isOk()
+        assertFalse auth.get().hasPermissionTo("auth")
     }
 
     @Test
     void 'should auth uri' () {
-        assertTrue AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC), "auth/test").isOk()
+        def auth = AUTH_MANAGER.getSession(Maps.of("Authorization", BASIC))
+        assertTrue auth.isOk()
+        assertTrue auth.get().hasPermissionTo("auth/test")
     }
 
 }

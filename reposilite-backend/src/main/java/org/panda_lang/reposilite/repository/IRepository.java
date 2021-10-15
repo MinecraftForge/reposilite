@@ -12,7 +12,10 @@ public interface IRepository {
     boolean isReadOnly();
     boolean isHidden();
     boolean canBrowse();
+    String getDelegate();
     Collection<String> getProxies();
+    boolean canContain(String path);
+
 
     /* Loads information from disc, or wherever the repos are stored.
      * Calculates quotas and stuff like that
@@ -33,6 +36,7 @@ public interface IRepository {
         Builder browseable(boolean value); //I need a better name...
         Builder quota(String value);
         Builder proxy(String... values);
+        Builder delegate(String value);
         Builder dir(File value);
         Builder baseDir(File value);
         IRepository build();

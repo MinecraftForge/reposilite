@@ -20,6 +20,7 @@ import groovy.transform.CompileStatic
 import io.javalin.http.Context
 import io.javalin.http.HandlerType
 import io.javalin.http.util.ContextUtil
+import java.util.Base64
 import java.util.concurrent.Executors
 import org.eclipse.jetty.server.HttpInput
 import org.eclipse.jetty.server.HttpOutput
@@ -32,8 +33,7 @@ import org.panda_lang.reposilite.repository.IRepositoryManager
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
-import static org.junit.jupiter.api.Assertions.assertEquals
-import static org.junit.jupiter.api.Assertions.assertNotNull
+import static org.junit.jupiter.api.Assertions.*
 import static org.mockito.ArgumentMatchers.anyString
 import static org.mockito.Mockito.*
 
@@ -58,6 +58,9 @@ class ReposiliteContextFactoryTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
+            .repo('filtered', {
+                it.prefix('/special/')
+            })
             .repo("releases", {})
             .repo("snapshots", {})
             .build()
@@ -66,6 +69,8 @@ class ReposiliteContextFactoryTest {
             .dir(WORKING_DIRECTORY)
             .repo(REPOSITORY_MANAGER)
             .build();
+
+        AUTH_MANAGER.createToken("/releases/", "auth", "rwm", "password");
     }
 
     @Test
@@ -82,6 +87,18 @@ class ReposiliteContextFactoryTest {
         assertEquals 'forwarded address', context.address()
         assertEquals HEADERS, context.headers()
         assertNotNull context.input()
+    }
+
+    @Test
+    void 'should have valid session' () {
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/api', 'auth', 'password'))
+        assertTrue context.session().isOk()
+    }
+
+    @Test
+    void 'should have invalid session' () {
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/api', 'auth', 'wrong'))
+        assertTrue context.session().isErr()
     }
 
     @Test
@@ -102,20 +119,32 @@ class ReposiliteContextFactoryTest {
         assertEquals 'releases/net/minecraftforge/test', context.normalized()
     }
 
+    @Test
+    void 'should add filtered repository' () {
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/special/minecraftforge/test'))
+        assertEquals 'filtered/special/minecraftforge/test', context.normalized()
+    }
+
     private static Context createContext() {
         return createContext('uri')
     }
     private static Context createContext(String uri) {
+        return createContext(uri, null, null)
+    }
+    private static Context createContext(String uri, String username, String password) {
+        def headers = new HashMap<>(HEADERS)
+        if (username != null)
+            headers.put('Authorization', 'Basic ' + Base64.encoder.encodeToString((username + ':' + password).bytes))
         def request = mock(HttpServletRequest.class, RETURNS_DEEP_STUBS)
         when(request.getRequestURI()).thenReturn(uri)
         when(request.getMethod()).thenReturn('GET')
         when(request.getRemoteAddr()).thenReturn("localhost")
         when(request.getInputStream()).thenReturn(mock(HttpInput.class))
-        when(request.getHeaderNames()).thenReturn(Collections.enumeration(HEADERS.keySet()))
-        when(request.headerNames).thenReturn(Collections.enumeration(HEADERS.keySet()))
+        when(request.getHeaderNames()).thenReturn(Collections.enumeration(headers.keySet()))
+        when(request.headerNames).thenReturn(Collections.enumeration(headers.keySet()))
         when(request.getHeader(anyString())).thenAnswer({ invocation ->
             def header = invocation.getArgument(0) as String
-            return HEADERS.get(header)
+            return headers.get(header)
         })
 
         def response = mock HttpServletResponse.class, RETURNS_DEEP_STUBS

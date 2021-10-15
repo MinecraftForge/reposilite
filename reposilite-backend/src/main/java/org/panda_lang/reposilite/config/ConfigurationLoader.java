@@ -43,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.function.Predicate;
 
 public final class ConfigurationLoader {
@@ -100,6 +101,8 @@ public final class ConfigurationLoader {
     public static Configuration tryLoad(String customConfigurationFile, String workingDirectory) {
         try {
             return load(customConfigurationFile, workingDirectory);
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception exception) {
             throw new RuntimeException("Cannot load configuration", exception);
         }
@@ -144,13 +147,30 @@ public final class ConfigurationLoader {
             config.basePath = basePath;
         }
 
-        for (Repository repo : config.repositories.values()) {
+        for (Entry<String, Repository> entry : config.repositories.entrySet()) {
+            String name = entry.getKey();
+            Repository repo = entry.getValue();
             for (int index = 0; index < repo.proxies.size(); index++) {
                 String proxy = repo.proxies.get(index);
 
                 if (!proxy.endsWith("/")) {
                     repo.proxies.set(index, proxy + '/');
                 }
+            }
+
+            if (repo.delegate != null) {
+                repo.delegate = repo.delegate.trim();
+                if (repo.delegate.isEmpty())
+                    repo.delegate = null;
+                else if (!config.repositories.containsKey(repo.delegate))
+                    throw new IllegalStateException("Repository " + name + " specifies delegate \"" + repo.delegate + "\" that does not exist.");
+                else if (!repo.proxies.isEmpty())
+                    throw new IllegalStateException("Repository " + name + " specified a delegate, and proxies. Only one is allowed");
+            }
+
+            for (int index = 0; index < repo.prefixes.size(); index++) {
+                String prefix = FilesUtils.trim(repo.prefixes.get(index), '/');
+                repo.prefixes.set(index, prefix + '/');
             }
         }
     }

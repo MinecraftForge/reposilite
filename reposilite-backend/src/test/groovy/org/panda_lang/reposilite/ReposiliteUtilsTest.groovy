@@ -43,6 +43,9 @@ class ReposiliteUtilsTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
+            .repo('isspecial', {
+                it.prefix('special/')
+            })
             .repo("releases", {})
             .repo("snapshots", {})
             .build()
@@ -54,8 +57,13 @@ class ReposiliteUtilsTest {
     }
 
     @Test
-    void 'should rewrite path' () {
+    void 'should rewrite path to releases' () {
         assertEquals "releases/without/repo/", ReposiliteUtils.normalizeUri(REPOSITORY_MANAGER, "/without/repo/").get()
+    }
+
+    @Test
+    void 'should rewrite path to isspecial' () {
+        assertEquals "isspecial/special/without/repo/", ReposiliteUtils.normalizeUri(REPOSITORY_MANAGER, "/special/without/repo/").get()
     }
 
     @Test

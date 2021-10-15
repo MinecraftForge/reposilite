@@ -38,50 +38,68 @@ import static org.junit.jupiter.api.Assertions.*
 @CompileStatic
 class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
     {
-        super.properties.put('reposilite.repositories', 'releases,snapshots,private,zero')
-        super.properties.put('reposilite.repositories.private.hidden', 'true')
-        super.properties.put('reposilite.repositories.private.allowUploads', 'false')
-        super.properties.put('reposilite.repositories.zero.diskQuota', '0MB')
+        super.properties.putAll([
+            'reposilite.repositories': 'isspecial,releases,snapshots,private,zero',
+
+            'reposilite.repositories.isspecial.prefixes': '/special/',
+
+            'reposilite.repositories.private.hidden': 'true',
+            'reposilite.repositories.private.allowUploads': 'false',
+
+            'reposilite.repositories.zero.diskQuota': '0MB'
+        ])
     }
 
     private final HttpClient client = HttpClients.createDefault()
+    private String PASSWORD;
 
     @BeforeEach
     void configure() {
-        super.reposilite.getAuth().createToken('/', 'root', 'rwm', 'password')
-        super.reposilite.getAuth().createToken('/', 'read', 'r', 'password')
-        super.reposilite.getAuth().createToken('/releases/auth/test', 'authtest', 'rwm', 'secure')
-        super.reposilite.getAuth().createToken('/private', 'private', 'rwm', 'secure')
+        PASSWORD = super.reposilite.getAuth().createRandomPassword() // Random password to be sure we don't hardcode anything in the codebase.
+        super.reposilite.getAuth().createToken('/', 'root', 'rwm', PASSWORD)
+        super.reposilite.getAuth().createToken('/', 'read', 'r', PASSWORD)
+        super.reposilite.getAuth().createToken('/releases/auth/test', 'authtest', 'rwm', PASSWORD)
+        super.reposilite.getAuth().createToken('/private', 'private', 'rwm', PASSWORD)
     }
 
     @Test
     void 'should return 507 and out of disk space message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/zero/groupId/artifactId/file', 'root', 'password', 'content', HttpStatus.SC_INSUFFICIENT_STORAGE, 'Out of disk space'
+        shouldReturnErrorWithGivenMessage '/zero/groupId/artifactId/file', 'root', PASSWORD, 'content', HttpStatus.SC_INSUFFICIENT_STORAGE, 'Out of disk space'
     }
 
     @Test
     void 'should return 401 and permissions message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'read', 'password', 'content', HttpStatus.SC_UNAUTHORIZED, 'Cannot deploy artifact without write permission'
+        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'read', PASSWORD, 'content', HttpStatus.SC_UNAUTHORIZED, 'Cannot deploy artifact without write permission'
     }
 
     @Test
     void 'should return 405 and artifact deployment is disabled message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/private/groupId/artifactId/file', 'private', 'secure', 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Artifact deployment is disabled'
+        shouldReturnErrorWithGivenMessage '/private/groupId/artifactId/file', 'private', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Artifact deployment is disabled'
     }
 
     @Test
     void 'should return 401 and invalid credentials message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'authtest', 'invalid_token', 'content', HttpStatus.SC_UNAUTHORIZED, 'Invalid authorization credentials'
+        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'authtest', 'invalid password', 'content', HttpStatus.SC_UNAUTHORIZED, 'Invalid authorization credentials'
     }
 
     @Test
     void 'should return 200 and success message for metadata files' () throws IOException, AuthenticationException {
-        shouldReturn200AndSuccessMessage '/releases/auth/test/maven-metadata.xml', 'authtest', 'secure', StringUtils.EMPTY
+        shouldReturn200AndSuccessMessage '/releases/auth/test/maven-metadata.xml', 'authtest', PASSWORD, StringUtils.EMPTY
     }
 
     @Test
     void 'should return 200 and success message'() throws IOException, AuthenticationException {
-        shouldReturn200AndSuccessMessage '/releases/auth/test/pom.xml', 'authtest', 'secure', 'maven metadata content'
+        shouldReturn200AndSuccessMessage '/releases/auth/test/pom.xml', 'authtest', PASSWORD, 'maven metadata content'
+    }
+
+    @Test
+    void 'should return 405 and can not contain message' () throws Exception {
+        shouldReturnErrorWithGivenMessage '/isspecial/not/special', 'root', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Repository isspecial can not contain: not/special'
+    }
+
+    @Test
+    void 'should return 200 and success message for special'() throws IOException, AuthenticationException {
+        shouldReturn200AndSuccessMessage '/isspecial/special/file', 'root', PASSWORD, 'content'
     }
 
     private void shouldReturn200AndSuccessMessage(String uri, String username, String password, String content) throws IOException, AuthenticationException {

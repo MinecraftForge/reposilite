@@ -106,6 +106,7 @@ public final class Reposilite {
                 .hidden(repc.hidden)
                 .readOnly(!repc.allowUploads)
                 .browseable(repc.browseable)
+                .delegate(repc.delegate)
                 .quota(repc.diskQuota);
 
             if (repc.prefixes != null)

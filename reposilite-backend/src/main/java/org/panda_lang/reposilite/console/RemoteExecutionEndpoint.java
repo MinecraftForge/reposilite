@@ -74,7 +74,7 @@ public final class RemoteExecutionEndpoint implements IAuthedHandler {
     public void handle(Context ctx, ReposiliteContext context) {
         Reposilite.getLogger().info("REMOTE EXECUTION " + context.uri() + " from " + context.address());
 
-        Result<Session, String> authResult = auth.getSession(context.headers(), null);
+        Result<Session, String> authResult = auth.getSession(context.headers());
 
         if (authResult.isErr()) {
             ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, authResult.getError());

@@ -17,10 +17,12 @@
 package org.panda_lang.reposilite;
 
 import org.panda_lang.reposilite.auth.IAuthManager;
+import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.repository.IRepository;
 import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
+import org.panda_lang.utilities.commons.function.Result;
 import org.panda_lang.utilities.commons.function.ThrowingConsumer;
 import org.panda_lang.utilities.commons.function.ThrowingSupplier;
 
@@ -33,8 +35,10 @@ import java.util.Map;
 
 public final class ReposiliteContext {
     public static ReposiliteContext create(IAuthManager auth, IRepositoryManager repos, String ipHeader, Context context) {
+        Map<String, String> headers = context.headerMap(); // this can only be called once with a valid result for some reason, so cache it here
         String realIp = context.header(ipHeader);
         String address = StringUtils.isEmpty(realIp) ? context.req.getRemoteAddr() : realIp;
+        Result<Session, String> session = auth.getSession(headers);
 
         String uri = context.req.getRequestURI();
         if (uri.startsWith("/api/"))
@@ -60,10 +64,11 @@ public final class ReposiliteContext {
             filepath,
             context.method(),
             address,
-            context.headerMap(),
+            headers,
             context.req::getInputStream,
             repo,
-            auth
+            auth,
+            session
         );
     }
 
@@ -76,6 +81,7 @@ public final class ReposiliteContext {
     private final ThrowingSupplier<InputStream, IOException> input;
     private final IRepository repo;
     private final IAuthManager auth;
+    private final Result<Session, String> session;
     private ThrowingConsumer<OutputStream, IOException> result;
 
     private ReposiliteContext(
@@ -87,7 +93,8 @@ public final class ReposiliteContext {
             Map<String, String> header,
             ThrowingSupplier<InputStream, IOException> input,
             IRepository repo,
-            IAuthManager auth) {
+            IAuthManager auth,
+            Result<Session, String> session) {
 
         this.uri = uri;
         this.normalized = normalized;
@@ -98,6 +105,7 @@ public final class ReposiliteContext {
         this.input = input;
         this.repo = repo;
         this.auth = auth;
+        this.session = session;
     }
 
     public void result(ThrowingConsumer<OutputStream, IOException> result) {
@@ -142,5 +150,13 @@ public final class ReposiliteContext {
 
     public IAuthManager auth() {
         return auth;
+    }
+
+    public Result<Session, String> session() {
+        return this.session;
+    }
+
+    public Result<Session, String> session(String url) {
+        return session.flatMap(s -> s.hasPermissionTo(url) ? Result.ok(s) : Result.error("Unauthorized access attempt"));
     }
 }
