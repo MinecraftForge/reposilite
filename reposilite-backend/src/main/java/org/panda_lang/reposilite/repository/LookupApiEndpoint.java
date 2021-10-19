@@ -146,13 +146,14 @@ final class LookupApiEndpoint implements IAuthedHandler {
         }
 
         ctx.json(new FileListDto(Arrays.stream(FilesUtils.listFiles(requestedFile))
-                .sorted((a,b) -> {
-                    if (a.isDirectory() != b.isDirectory())
-                        return a.isDirectory() ? -1 : 1;
-                    return a.getName().compareTo(b.getName());
-                })
-                .map(FileDetailsDto::of)
-                .toList()));
+            .sorted((a,b) -> {
+                if (a.isDirectory() != b.isDirectory())
+                    return a.isDirectory() ? -1 : 1;
+                return a.getName().compareTo(b.getName());
+            })
+            .map(FileDetailsDto::of)
+            .collect(Collectors.toList())
+        ));
     }
 
 
