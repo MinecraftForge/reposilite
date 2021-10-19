@@ -23,13 +23,13 @@ final class LookupResponse {
 
     private static final LookupResponse EMPTY_RESPONSE = new LookupResponse();
 
-    private final Option<String> value;
+    private final Option<byte[]> value;
     private final Option<FileDetailsDto> fileDetails;
     private final Option<String> contentType;
     private final boolean attachment;
 
-    LookupResponse(String contentType, String value) {
-        this.value = Option.of(value);
+    LookupResponse(String contentType, byte[] data) {
+        this.value = Option.of(data);
         this.fileDetails = Option.none();
         this.contentType = Option.of(contentType);
         this.attachment = false;
@@ -61,7 +61,7 @@ final class LookupResponse {
         return fileDetails;
     }
 
-    Option<String> getValue() {
+    Option<byte[]> getValue() {
         return value;
     }
 

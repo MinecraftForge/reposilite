@@ -1,7 +1,6 @@
 package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -22,18 +21,20 @@ import static org.junit.jupiter.api.Assertions.*
 @CompileStatic
 final class LookupProxyTest extends ReposiliteIntegrationTestSpecification {
     {
-        super.properties.put('reposilite.proxyConnectTimeout', '1000')
-        super.properties.put('reposilite.proxyReadTimeout',    '1000')
-        super.properties.put('reposilite.repositories',        'releases,snapshots,proxy')
-        super.properties.put('reposilite.repositories.proxy.allowUploads', 'false')
-        super.properties.put('reposilite.repositories.proxy.proxies',      'http://localhost:' + PORT + '/releases')
+        super.properties.putAll([
+            'proxyConnectTimeout': '1000',
+            'proxyReadTimeout':    '1000',
+            'repositories':        'main-releases,main-snapshots,proxy',
+            'repositories.proxy.allowUploads': 'false',
+            'repositories.proxy.proxies':      'http://localhost:' + PORT + '/main-releases',
+        ])
     }
     private static final String FILE_PATH = '/proxiedGroup/artifact/version/proxied.pom'
     private static final String FILE_CONTENT = 'proxied content'
 
     @BeforeEach
     void configure() throws IOException {
-        def file = super.reposilite.repos.getRepo('releases').getFile(FILE_PATH)
+        def file = super.reposilite.repos.getRepo('main-releases').getFile(FILE_PATH)
         file.getParentFile().mkdirs()
         file.createNewFile()
         FileUtils.overrideFile(file, FILE_CONTENT)

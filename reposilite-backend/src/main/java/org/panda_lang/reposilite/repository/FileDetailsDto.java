@@ -22,15 +22,13 @@ import org.panda_lang.utilities.commons.StringUtils;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 
-@SuppressWarnings("serial")
-final class FileDetailsDto implements Serializable, Comparable<FileDetailsDto> {
+final class FileDetailsDto implements Comparable<FileDetailsDto> {
 
-    public static final String FILE = "file";
-    public static final String DIRECTORY = "directory";
+    static final String FILE = "file";
+    static final String DIRECTORY = "directory";
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
 
@@ -81,6 +79,11 @@ final class FileDetailsDto implements Serializable, Comparable<FileDetailsDto> {
 
     public String getType() {
         return type;
+    }
+
+    @Override
+    public String toString() {
+        return "FileDetailsDto[" + getType() + ", " + getDate() + ", " + getName() + ", " + getContentType() + ", " + getContentLength() + "]";
     }
 
     public static FileDetailsDto of(File file) {

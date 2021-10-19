@@ -18,80 +18,109 @@ package org.panda_lang.reposilite.repository
 
 
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
-import net.dzikoysk.cdn.model.Configuration
-import org.apache.http.HttpStatus
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
 import org.panda_lang.reposilite.auth.Token
+import org.panda_lang.reposilite.error.ErrorDto
 import org.panda_lang.utilities.commons.collection.Pair
 
+
+import static org.apache.http.HttpStatus.*
 import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
     {
-        super.properties.put('reposilite.repositories', 'releases,snapshots,private')
-        super.properties.put('reposilite.repositories.private.hidden', 'true')
+        super.properties.putAll([
+            'repositories':                'main-releases,main-snapshots,private',
+            'repositories.private.hidden': 'true'
+        ])
     }
 
     @Test
-    void 'should return list of repositories' () {
-        def repositories = shouldReturn200AndJson('/api')
-        assertNotNull repositories.get('files')
-
-        def files = repositories.getSection('files').get()
-        assertEquals 2, files.size()
-        assertEquals 'releases', files.getSection(0).get().getString('name', null)
-        assertEquals 'snapshots', files.getSection(1).get().getString('name', null)
+    void 'root should return list of repositories' () {
+        def resp = shouldReturn200AndFileList('/api')
+        assertNotNull resp
+        assertEquals 2, resp.files.size()
+        assertEquals(['main-releases', 'main-snapshots'], getNames(resp))
     }
 
     @Test
-    void 'should return list of all authenticated repositories' () {
+    void 'root should return list of all authenticated repositories' () {
         def token = super.reposilite.getAuth().createToken('/private', 'secret', 'rwm', 'password')
-        def response = shouldReturn200AndJson('/api', token.alias, 'password')
-        def files = response.getSection('files').get()
-        assertEquals 3, files.size()
-        assertEquals 'releases', files.getSection(0).get().getString('name').get()
-        assertEquals 'snapshots', files.getSection(1).get().getString('name').get()
-        assertEquals 'private', files.getSection(2).get().getString('name').get()
+        def resp = shouldReturn200AndFileList('/api', token.alias, 'password')
+        assertEquals 3, resp.files.size()
+        assertEquals(['main-releases', 'main-snapshots', 'private'], getNames(resp))
     }
 
     @Test
-    void 'should return 200 and latest file' () {
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/latest')
-        assertEquals 'directory', result.getString('type').get()
-        assertEquals '1.0.1-SNAPSHOT', result.getString('name').get()
+    void 'explicit should return 200 and latest release file' () {
+        def result = shouldReturn200AndFileDetails('/api/main-releases/reposilite/test/latest')
+        assertEquals FileDetailsDto.DIRECTORY, result.type
+        assertEquals '1.0.1', result.name
     }
 
     @Test
-    void 'should return 404 if requested file is not found' () {
-        def response = shouldReturn404AndData('/api/org/panda-lang/reposilite-test/unknown')
-        assertTrue response.contains('File not found')
+    void 'explicit should return 200 and latest snapshot file' () {
+        def result = shouldReturn200AndFileDetails('/api/main-snapshots/reposilite/test/latest')
+        assertEquals FileDetailsDto.DIRECTORY, result.type
+        assertEquals '1.0.1-SNAPSHOT', result.name
     }
 
     @Test
-    void 'should return 200 and file dto' () {
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.jar')
-        assertEquals 'file', result.getString('type').get()
-        assertEquals 'reposilite-test-1.0.0.jar', result.getString('name').get()
+    void 'explicit should return 404 if requested file is not found' () {
+        def resp = shouldReturn404AndError('/api/main-releases/reposilite/test/unknown')
+        assertEquals 'File not found', resp.message
     }
 
     @Test
-    void 'should return 200 and directory dto' () {
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test')
-        def files = result.getSection('files').get()
-        assertEquals '1.0.1-SNAPSHOT', files.getSection(0).get().getString('name').get()
+    void 'explicit should return 200 and file dto' () {
+        def result = shouldReturn200AndFileDetails('/api/main-releases/reposilite/test/1.0.0/test-1.0.0.jar')
+        assertEquals FileDetailsDto.FILE, result.type
+        assertEquals 'test-1.0.0.jar', result.name
     }
 
-    private static Configuration shouldReturn200AndJson(String uri) {
-        return shouldReturnJson(HttpStatus.SC_OK, uri)
-    }
-    private static Configuration shouldReturn200AndJson(String uri, String username, String password) {
-        return shouldReturnJson(HttpStatus.SC_OK, uri, username, password)
-    }
-    private static String shouldReturn404AndData(String uri) {
-        return shouldReturnData(HttpStatus.SC_NOT_FOUND, uri)
+    @Test
+    void 'explicit should return 200 and directory list' () {
+        def result = shouldReturn200AndFileList('/api/main-releases/reposilite/test')
+        assertEquals 4, result.files.size()
+        assertEquals(['1.0.0', '1.0.1', 'maven-metadata.xml', 'maven-metadata.xml.md5'], getNames(result))
     }
 
+    @Test
+    void 'releases should return not implemented for non-explicit request' () {
+        def resp = shouldReturn501AndError('/api/releases/reposilite/test')
+        assertEquals 'Can not browse API in merged views. Must specify a repository', resp.message
+    }
+
+    @Test
+    void 'all should return 404 for root repository, or repository not found' () {
+        def resp = shouldReturn404AndError('/api/reposilite/test')
+        assertEquals 'Can not find repo at: reposilite/test', resp.message
+    }
+
+    private static FileListDto shouldReturn200AndFileList(String uri) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri), FileListDto.class)
+    }
+    private static FileListDto shouldReturn200AndFileList(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri, username, password), FileListDto.class)
+    }
+    private static FileDetailsDto shouldReturn200AndFileDetails(String uri) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri), FileDetailsDto.class)
+    }
+    private static FileDetailsDto shouldReturn200AndFileDetails(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri, username, password), FileDetailsDto.class)
+    }
+    private static ErrorDto shouldReturn404AndError(String uri) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_NOT_FOUND, uri), ErrorDto.class)
+    }
+    private static ErrorDto shouldReturn501AndError(String uri) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_NOT_IMPLEMENTED, uri), ErrorDto.class)
+    }
+    private static List<String> getNames(FileListDto data) {
+        return data.getFiles().stream().map{ it.name }.toList()
+    }
 }

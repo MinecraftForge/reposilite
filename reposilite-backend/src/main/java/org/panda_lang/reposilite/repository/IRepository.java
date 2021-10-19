@@ -15,6 +15,7 @@ public interface IRepository {
     String getDelegate();
     Collection<String> getProxies();
     boolean canContain(String path);
+    boolean isDirectory(String path);
 
 
     /* Loads information from disc, or wherever the repos are stored.
@@ -25,7 +26,7 @@ public interface IRepository {
 
     //TODO: Make this not use files, but something that allows us to swap out storage backends
     File getFile(String... elements);
-    boolean contains(String... path);
+    boolean contains(String path);
 
     public interface Builder {
         Builder prefix(String... values);

@@ -28,32 +28,35 @@ import static org.junit.jupiter.api.Assertions.*
 class RepositoryTest {
 
     @TempDir
-    protected static File temp
+    protected static File WORKINGG_DIRECTORY
 
-    private static IRepository repository
+    private static IRepository REPOSITORY
 
     @BeforeAll
     static void prepare() {
-        repository = IRepository.builder("releases").dir(temp).build();
+        REPOSITORY = IRepository
+            .builder('test')
+            .dir(WORKINGG_DIRECTORY)
+            .build();
 
-        repository.getFile("group", "artifact", "version").mkdirs()
-        repository.getFile("group", "artifact", "version", "test").createNewFile()
+        REPOSITORY.getFile('group/artifact/version/').mkdirs()
+        REPOSITORY.getFile('group/artifact/version/test').createNewFile()
     }
 
     @Test
     void 'should find requested entity' () {
-        assertFalse repository.contains("unknown")
-        assertTrue repository.contains("group", "artifact", "version", "test")
+        assertFalse REPOSITORY.contains('unknown')
+        assertTrue REPOSITORY.contains('group/artifact/version/test')
     }
 
     @Test
     void 'should return file' () {
-        assertEquals "test", repository.getFile("test").getName()
+        assertEquals 'test', REPOSITORY.getFile('test').getName()
     }
 
     @Test
     void 'should return repository name' () {
-        assertEquals "releases", repository.getName()
+        assertEquals 'test', REPOSITORY.getName()
     }
 
 }

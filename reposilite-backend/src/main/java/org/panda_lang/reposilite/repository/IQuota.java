@@ -4,7 +4,7 @@ public interface IQuota {
     long getUsage();
     long getCapacity();
 
-    default boolean notFull() {
+    default boolean hasSpace() {
         return getUsage() < getCapacity();
     }
 }

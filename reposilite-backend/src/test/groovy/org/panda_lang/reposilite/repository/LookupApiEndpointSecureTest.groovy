@@ -19,117 +19,129 @@ package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
 import java.util.stream.Collectors
-import net.dzikoysk.cdn.CdnFactory
-import net.dzikoysk.cdn.model.Configuration
-import org.apache.http.HttpStatus
+
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
 import org.panda_lang.reposilite.auth.Permission
 import org.panda_lang.reposilite.auth.Token
+import org.panda_lang.reposilite.error.ErrorDto
 import org.panda_lang.utilities.commons.collection.Pair
 
 import static org.junit.jupiter.api.Assertions.*
 import static org.panda_lang.reposilite.auth.Permission.*
-
-import com.google.api.client.http.HttpResponse
+import static org.apache.http.HttpStatus.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification {
-
     {
-        super.properties.put('reposilite.repositories', 'releases,snapshots,private')
-        super.properties.put('reposilite.repositories.releases.browseable', 'false')
-        super.properties.put('reposilite.repositories.snapshots.browseable', 'false')
-        super.properties.put('reposilite.repositories.private.hidden', 'true')
-        super.properties.put('reposilite.repositories.private.browseable', 'false')
+        super.properties.putAll([
+            'repositories':                           'main-releases,main-snapshots,private',
+            'repositories.main-releases.browseable':  'false',
+            'repositories.main-snapshots.browseable': 'false',
+            'repositories.private.hidden':            'true',
+            'repositories.private.browseable':        'false'
+        ])
     }
 
     @Test
-    void 'should return 401 listing repositories' () {
+    void 'root should return 401 listing repositories' () {
         shouldReturn401('/api')
     }
 
     @Test
-    void 'should return list of all authenticated repositories' () {
-        def token = makeToken('*/', Permission.READ)
-        def repositories = shouldReturn200AndJson('/api', token)
-
-        def files = repositories.getSection('files').get()
-        assertEquals 3, files.size()
-        assertEquals 'releases', files.getSection(0).get().getString('name').get()
-        assertEquals 'snapshots', files.getSection(1).get().getString('name').get()
-        assertEquals 'private', files.getSection(2).get().getString('name').get()
+    void 'root should return list of all authenticated repositories' () {
+        def password = makeToken('/', 'username', Permission.READ)
+        def resp = shouldReturn200AndFileList('/api', 'username', password)
+        assertEquals 3, resp.files.size()
+        assertEquals(['main-releases', 'main-snapshots', 'private'], getNames(resp))
     }
 
     @Test
-    void 'should return 200 and latest file' () {
-        def token = makeToken('/releases', Permission.READ)
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/latest', token)
-        assertEquals 'directory', result.getString('type').get()
-        assertEquals '1.0.1-SNAPSHOT', result.getString('name').get()
+    void 'explicit should return 200 and latest release file' () {
+        def password = makeToken('/', 'username', Permission.READ)
+        def result = shouldReturn200AndFileDetails('/api/main-releases/reposilite/test/latest', 'username', password)
+        assertEquals FileDetailsDto.DIRECTORY, result.type
+        assertEquals '1.0.1', result.name
     }
 
     @Test
-    void 'should return 401 getting latest file' () {
-        shouldReturn401('/api/org/panda-lang/reposilite-test/latest')
+    void 'explicit should return 200 and latest snapshot file' () {
+        def password = makeToken('/', 'username', Permission.READ)
+        def result = shouldReturn200AndFileDetails('/api/main-snapshots/reposilite/test/latest', 'username', password)
+        assertEquals FileDetailsDto.DIRECTORY, result.type
+        assertEquals '1.0.1-SNAPSHOT', result.name
     }
 
     @Test
-    void 'should return 404 if requested file is not found' () {
-        def token = makeToken('/releases', Permission.READ)
-        def response = shouldReturn404AndData('/api/org/panda-lang/reposilite-test/unknown', token)
-        assertTrue response.contains('File not found')
+    void 'explicit should return 401 getting latest file' () {
+        shouldReturn401('/api/main-releases/reposilite/test/latest')
     }
 
     @Test
-    void 'should return 401 if requested file is not found' () {
-        shouldReturn401('/api/org/panda-lang/reposilite-test/unknown')
+    void 'explicit should return 404 if requested file is not found' () {
+        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def resp = shouldReturn404AndError('/api/main-releases/reposilite/test/unknown', 'username', password)
+        assertEquals 'File not found', resp.message
     }
 
     @Test
-    void 'should return 200 and file dto' () {
-        def token = makeToken('/releases', Permission.READ)
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.jar', token)
-        assertEquals 'file', result.getString('type').get()
-        assertEquals 'reposilite-test-1.0.0.jar', result.getString('name').get()
+    void 'ecplicit should return 401 if requested file is not found without auth' () {
+        shouldReturn401('/api/main-releases/reposilite/test/unknown')
     }
 
     @Test
-    void 'should return 401 if requested file exists' () {
-        shouldReturn401('/api/org/panda-lang/reposilite-test/1.0.0/reposilite-test-1.0.0.jar')
+    void 'explicit should return 401 if requested file exists without auth' () {
+        shouldReturn401('/api/main-releases/reposilite/test/1.0.0/test-1.0.0.jar')
     }
 
     @Test
-    void 'should return 200 and directory dto' () {
-        def token = makeToken('/releases', Permission.READ)
-        def result = shouldReturn200AndJson('/api/org/panda-lang/reposilite-test', token)
-        def files = result.getSection('files').get()
-        assertEquals '1.0.1-SNAPSHOT', files.getSection(0).get().getString('name').get()
+    void 'explicit should return 200 and file details' () {
+        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def result = shouldReturn200AndFileDetails('/api/main-releases/reposilite/test/1.0.0/test-1.0.0.jar', 'username', password)
+        assertEquals FileDetailsDto.FILE, result.type
+        assertEquals 'test-1.0.0.jar', result.name
     }
 
     @Test
-    void 'should return 401 if requested directory exists' () {
-        shouldReturn401('/api/org/panda-lang/reposilite-test')
+    void 'ecplicit should return 200 and directory list' () {
+        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def result = shouldReturn200AndFileList('/api/main-releases/reposilite/test', 'username', password)
+        assertEquals 4, result.files.size()
+        assertEquals(['1.0.0', '1.0.1', 'maven-metadata.xml', 'maven-metadata.xml.md5'], getNames(result))
     }
 
-    private Pair<String, Token> makeToken(String path, Permission... perms) {
+    @Test
+    void 'explicit should return 401 if requested directory exists without auth' () {
+        shouldReturn401('/api/main-releases/reposilite/test')
+    }
+
+    private String makeToken(String path, String username, Permission... perms) {
         String password = super.reposilite.getAuth().createRandomPassword();
         StringBuilder buf = new StringBuilder()
         for (Permission perm : perms)
             buf.append(perm.name)
-        return new Pair<>(password, super.reposilite.getAuth().createToken(path, 'secret', buf.toString(), password))
+        super.reposilite.auth.createToken(path, username, buf.toString(), password)
+        return password
     }
 
-    private Configuration shouldReturn200AndJson(String uri, Pair<String, Token> token) {
-        return shouldReturnJson(HttpStatus.SC_OK, uri, token)
+    private static FileListDto shouldReturn200AndFileList(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri, username, password), FileListDto.class)
     }
-
-    private String shouldReturn404AndData(String uri, Pair<String, Token> token) {
-        return shouldReturnData(HttpStatus.SC_NOT_FOUND, uri, token)
+    private static FileDetailsDto shouldReturn200AndFileDetails(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri, username, password), FileDetailsDto.class)
+    }
+    private static ErrorDto shouldReturn404AndError(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_NOT_FOUND, uri, username, password), ErrorDto.class)
     }
 
     private void shouldReturn401(String uri) {
-        shouldReturn(HttpStatus.SC_UNAUTHORIZED, uri)
+        shouldReturn(SC_UNAUTHORIZED, uri)
     }
 
+    private static List<String> getNames(FileListDto data) {
+        return data.getFiles().stream().map{ it.name }.toList()
+    }
 }

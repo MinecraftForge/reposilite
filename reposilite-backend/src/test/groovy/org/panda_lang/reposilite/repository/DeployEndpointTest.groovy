@@ -39,14 +39,14 @@ import static org.junit.jupiter.api.Assertions.*
 class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'reposilite.repositories': 'isspecial,releases,snapshots,private,zero',
+            'repositories': 'isspecial,main-releases,main-snapshots,private,zero',
 
-            'reposilite.repositories.isspecial.prefixes': '/special/',
+            'repositories.isspecial.prefixes': 'special/',
 
-            'reposilite.repositories.private.hidden': 'true',
-            'reposilite.repositories.private.allowUploads': 'false',
+            'repositories.private.hidden': 'true',
+            'repositories.private.allowUploads': 'false',
 
-            'reposilite.repositories.zero.diskQuota': '0MB'
+            'repositories.zero.diskQuota': '0MB'
         ])
     }
 
@@ -58,7 +58,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
         PASSWORD = super.reposilite.getAuth().createRandomPassword() // Random password to be sure we don't hardcode anything in the codebase.
         super.reposilite.getAuth().createToken('/', 'root', 'rwm', PASSWORD)
         super.reposilite.getAuth().createToken('/', 'read', 'r', PASSWORD)
-        super.reposilite.getAuth().createToken('/releases/auth/test', 'authtest', 'rwm', PASSWORD)
+        super.reposilite.getAuth().createToken('/main-releases/auth/test', 'authtest', 'rwm', PASSWORD)
         super.reposilite.getAuth().createToken('/private', 'private', 'rwm', PASSWORD)
     }
 
@@ -69,7 +69,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 401 and permissions message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'read', PASSWORD, 'content', HttpStatus.SC_UNAUTHORIZED, 'Cannot deploy artifact without write permission'
+        shouldReturnErrorWithGivenMessage '/main-releases/groupId/artifactId/file', 'read', PASSWORD, 'content', HttpStatus.SC_UNAUTHORIZED, 'Cannot deploy artifact without write permission'
     }
 
     @Test
@@ -79,17 +79,17 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 401 and invalid credentials message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/releases/groupId/artifactId/file', 'authtest', 'invalid password', 'content', HttpStatus.SC_UNAUTHORIZED, 'Invalid authorization credentials'
+        shouldReturnErrorWithGivenMessage '/main-releases/groupId/artifactId/file', 'authtest', 'invalid password', 'content', HttpStatus.SC_UNAUTHORIZED, 'Invalid authorization credentials'
     }
 
     @Test
     void 'should return 200 and success message for metadata files' () throws IOException, AuthenticationException {
-        shouldReturn200AndSuccessMessage '/releases/auth/test/maven-metadata.xml', 'authtest', PASSWORD, StringUtils.EMPTY
+        shouldReturn200AndSuccessMessage '/main-releases/auth/test/maven-metadata.xml', 'authtest', PASSWORD, StringUtils.EMPTY
     }
 
     @Test
     void 'should return 200 and success message'() throws IOException, AuthenticationException {
-        shouldReturn200AndSuccessMessage '/releases/auth/test/pom.xml', 'authtest', PASSWORD, 'maven metadata content'
+        shouldReturn200AndSuccessMessage '/main-releases/auth/test/pom.xml', 'authtest', PASSWORD, 'maven metadata content'
     }
 
     @Test
@@ -100,6 +100,22 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
     @Test
     void 'should return 200 and success message for special'() throws IOException, AuthenticationException {
         shouldReturn200AndSuccessMessage '/isspecial/special/file', 'root', PASSWORD, 'content'
+    }
+
+    @Test
+    void 'should successfully publish to main-releases from releases'() throws Exception {
+        def file = super.reposilite.getRepos().getRepo('main-releases').getFile('test/upload/artifact')
+        assertFalse file.exists()
+        shouldReturn200AndSuccessMessage '/releases/test/upload/artifact', 'root', PASSWORD, 'content'
+        assertTrue file.exists()
+    }
+
+    @Test
+    void 'should successfully publish to ispecial from releases'() throws Exception {
+        def file = super.reposilite.getRepos().getRepo('isspecial').getFile('special/upload/artifact')
+        assertFalse file.exists()
+        shouldReturn200AndSuccessMessage '/releases/special/upload/artifact', 'root', PASSWORD, 'content'
+        assertTrue file.exists()
     }
 
     private void shouldReturn200AndSuccessMessage(String uri, String username, String password, String content) throws IOException, AuthenticationException {

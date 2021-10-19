@@ -48,14 +48,14 @@ class RepositoryStorageTest {
             .quota('0')
             .executor(new ThreadPoolExecutor(0, Integer.MAX_VALUE, 1, TimeUnit.SECONDS, new SynchronousQueue<>()))
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo("releases", {})
-            .repo("snapshots", {})
+            .repo('main-releases', {})
+            .repo('main-snapshots', {})
             .build()
     }
 
     @Test
     void 'should add size of written file to the disk quota'() {
-        def releases = REPOSITORY_MANAGER.getRepo('releases')
+        def releases = REPOSITORY_MANAGER.getRepo('main-releases')
         def initialUsage = REPOSITORY_MANAGER.quota.usage
         def string = 'test'
         def expectedUsage = initialUsage + string.bytes.length

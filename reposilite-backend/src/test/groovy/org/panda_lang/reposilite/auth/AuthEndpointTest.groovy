@@ -17,43 +17,50 @@
 package org.panda_lang.reposilite.auth
 
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
-import org.apache.http.HttpStatus
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
+import org.panda_lang.reposilite.error.ErrorDto
+import org.panda_lang.reposilite.repository.FileListDto
 
-import static org.junit.jupiter.api.Assertions.assertEquals
-import static org.junit.jupiter.api.Assertions.assertTrue
+import static org.apache.http.HttpStatus.*
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 final class AuthEndpointTest extends ReposiliteIntegrationTestSpecification {
-
-    @BeforeEach
-    void generateToken() {
-        reposilite.getAuth().createToken('/', 'admin', 'rwm', 'secret')
-    }
-
     @Test
     void 'should return 401 without credentials' () throws IOException {
         def response = getRequest('/api/auth')
-        assertEquals HttpStatus.SC_UNAUTHORIZED, response.getStatusCode()
-        assertTrue response.getHeaders().containsKey("www-authenticate")
+        assertEquals SC_UNAUTHORIZED, response.statusCode
+        assertTrue response.headers.containsKey('www-authenticate')
     }
 
     @Test
     void 'should return 401 for invalid credentials' () throws IOException {
-        def response = getAuthenticated('/api/auth', 'admin', 'giga_secret')
-        assertEquals HttpStatus.SC_UNAUTHORIZED, response.getStatusCode()
-        assertTrue response.getHeaders().containsKey("www-authenticate")
+        def password = reposilite.auth.createRandomPassword()
+        reposilite.auth.createToken('/', 'admin', 'rwm', password)
+        def response = getAuthenticated('/api/auth', 'admin', 'not the password')
+        assertEquals SC_UNAUTHORIZED, response.statusCode
+        assertTrue response.headers.containsKey('www-authenticate')
     }
 
     @Test
     void 'should return 200 and auth dto' () throws IOException {
-        def response = shouldReturnJson(HttpStatus.SC_OK, '/api/auth', 'admin', 'secret')
-        assertEquals 'rwm', response.getString('permissions').get()
-        assertEquals '/', response.getString('path').get()
-        assertEquals Arrays.asList('releases', 'snapshots'), response.getList('repositories', [])
+        def password = reposilite.auth.createRandomPassword()
+        reposilite.auth.createToken('/', 'admin', 'rwm', password)
+        def response = shouldReturn200AndAuth('/api/auth', 'admin', password)
+        assertEquals 'rwm', response.permissions
+        assertEquals '/', response.path
+        assertEquals(['main-releases', 'main-snapshots'], response.repositories)
     }
 
+    private static ErrorDto shouldReturn404AndError(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_NOT_FOUND, uri, username, password), ErrorDto.class)
+    }
+    private static AuthDto shouldReturn200AndAuth(String uri, String username, String password) {
+        return JSON_MAPPER.readValue(shouldReturnData(SC_OK, uri, username, password), AuthDto.class)
+    }
 }

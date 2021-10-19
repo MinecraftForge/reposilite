@@ -27,15 +27,15 @@ class ReposiliteTestSpecification extends ReposiliteTestSpecificationExtension {
     private static final String TINYLOG_WRITER_PROPERTY = 'tinylog.writerFile.file'
 
     @TempDir
-    protected File workingDirectory
+    protected File WORKING_DIRECTORY
     protected Reposilite reposilite
 
     @BeforeEach
     protected void before() throws Exception {
         try {
             System.setProperty(TINYLOG_WRITER_PROPERTY, 'target/log.txt')
-            this.reposilite = new Reposilite('', workingDirectory.getAbsolutePath(), true)
-            FileUtils.copyDirectory(new File("src/test/workspace/repositories"), new File(workingDirectory, "repositories"));
+            this.reposilite = new Reposilite('', WORKING_DIRECTORY.getAbsolutePath(), true)
+            FileUtils.copyDirectory(new File("src/test/workspace/repositories"), new File(WORKING_DIRECTORY, "repositories"));
             this.reposilite.load()
         } finally {
             System.clearProperty(TINYLOG_WRITER_PROPERTY)

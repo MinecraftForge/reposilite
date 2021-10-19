@@ -20,8 +20,7 @@ import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.function.Executable
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow
-import static org.junit.jupiter.api.Assertions.assertEquals
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 final class FilesUtilsTest {
@@ -66,4 +65,25 @@ final class FilesUtilsTest {
         assertEquals '', FilesUtils.trim('////', '/' as char)
     }
 
+    @Test
+    void 'should validate repository names' () {
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("UpperCase")
+        }
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("main-bad")
+        }
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("releases")
+        }
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("snapshots")
+        }
+
+        assertDoesNotThrow({
+            FilesUtils.validateRepositoryName("valid")
+            FilesUtils.validateRepositoryName("valid-releases")
+            FilesUtils.validateRepositoryName("valid-snapshots")
+        } as Executable)
+    }
 }

@@ -17,7 +17,6 @@
 package org.panda_lang.reposilite.config
 
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -59,13 +58,13 @@ class ConfigurationLoaderTest {
             'port':         '8080',         // Integer type
             'debugEnabled': 'true',         // Boolean type
             'repositories': ' ',            // Skip empty
-            'repositories.releases.proxies': 'http://a.com,b.com',  // List<String> type
+            'repositories.main-releases.proxies': 'http://a.com,b.com',  // List<String> type
         ])
 
         assertEquals "localhost", conf.hostname
         assertEquals 8080, conf.port
         assertTrue conf.debugEnabled
-        assertEquals Arrays.asList("http://a.com/", "b.com/"), conf.repositories.get('releases').proxies
+        assertEquals Arrays.asList("http://a.com/", "b.com/"), conf.repositories.get('main-releases').proxies
         assertFalse conf.repositories.isEmpty()
     }
 
@@ -101,14 +100,14 @@ class ConfigurationLoaderTest {
 
     @Test
     void 'should sanitize proxies' () {
-        def config = cfg(['repositories.snapshots.proxies': 'https://without.slash,https://with.slash/'])
-        assertEquals Arrays.asList('https://without.slash/', 'https://with.slash/'), config.repositories.get('snapshots').proxies
+        def config = cfg(['repositories.main-snapshots.proxies': 'https://without.slash,https://with.slash/'])
+        assertEquals Arrays.asList('https://without.slash/', 'https://with.slash/'), config.repositories.get('main-snapshots').proxies
     }
 
     @Test
     void 'should sanitize prefixes' () {
-        def config = cfg(['repositories.snapshots.prefixes': 'without.slash,with.slash/,/with.extra.slash/'])
-        assertEquals Arrays.asList('without.slash/', 'with.slash/', 'with.extra.slash/'), config.repositories.get('snapshots').prefixes
+        def config = cfg(['repositories.main-snapshots.prefixes': 'without.slash,with.slash/,/with.extra.slash/'])
+        assertEquals Arrays.asList('without.slash/', 'with.slash/', 'with.extra.slash/'), config.repositories.get('main-snapshots').prefixes
     }
 
     @Test
@@ -121,8 +120,8 @@ class ConfigurationLoaderTest {
     void 'should error with proxy and delegate' () {
         assertThrows IllegalStateException.class, {
             cfg([
-                'repositories.releases.delegate': 'snapshots',
-                'repositories.releases.proxies':  'localhost'
+                'repositories.main-releases.delegate': 'main-snapshots',
+                'repositories.main-releases.proxies':  'localhost'
             ])
         }
     }
@@ -130,8 +129,7 @@ class ConfigurationLoaderTest {
     @Test
     void 'should error with invalid delegate' () {
         assertThrows IllegalStateException.class, {
-            cfg(['repositories.releases.delegate': 'unknown repo'])
+            cfg(['repositories.main-releases.delegate': 'unknown repo'])
         }
     }
-
 }

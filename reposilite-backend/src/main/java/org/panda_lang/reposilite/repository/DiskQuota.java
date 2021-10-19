@@ -40,8 +40,8 @@ final class DiskQuota implements IQuota {
         usage.addAndGet(size);
     }
 
-    public boolean notFull() {
-        return (this.parent == null || this.parent.notFull()) && usage.get() < quota.get();
+    public boolean hasSpace() {
+        return (this.parent == null || this.parent.hasSpace()) && usage.get() < quota.get();
     }
 
     @Override

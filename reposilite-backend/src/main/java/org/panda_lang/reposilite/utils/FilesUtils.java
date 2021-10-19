@@ -20,7 +20,6 @@ import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.utilities.commons.IOUtils;
 import org.panda_lang.utilities.commons.StringUtils;
-import org.panda_lang.utilities.commons.function.PandaStream;
 
 import java.io.Closeable;
 import java.io.File;
@@ -32,7 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.DecimalFormat;
-import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -135,12 +134,6 @@ public final class FilesUtils {
         return files == null ? EMPTY : files;
     }
 
-    public static List<String> toNames(File[] files) {
-        return PandaStream.of(files)
-                .map(File::getName)
-                .toList();
-    }
-
     public static String getExtension(String name) {
         int occurrence = name.lastIndexOf(".");
         return occurrence == -1 ? StringUtils.EMPTY : name.substring(occurrence + 1);
@@ -175,4 +168,18 @@ public final class FilesUtils {
         return data;
     }
 
+    public static void validateRepositoryName(String name) {
+        if (!name.equals(name.toLowerCase(Locale.ENGLISH)))
+            throw new IllegalArgumentException("Invalid repository name: " + name + " (not lowercase)");
+
+        if (name.indexOf('/') != -1 || name.indexOf('\\') != -1 || name.contains(".."))
+            throw new IllegalArgumentException("Invalid repository name: " + name + " (directory traversal)");
+
+        if ("releases".equals(name) || "snapshots".equals(name))
+            throw new IllegalArgumentException("Invalid repository name: " + name + " (reserved name)");
+
+        int idx  = name.indexOf('-');
+        if (idx != -1 && !"-releases".equals(name.substring(idx)) && !"-snapshots".equals(name.substring(idx)))
+            throw new IllegalArgumentException("Invalid repository name: " + name + " (illegal suffix)");
+    }
 }

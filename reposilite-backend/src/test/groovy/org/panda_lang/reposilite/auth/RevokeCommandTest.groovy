@@ -43,7 +43,7 @@ class RevokeCommandTest extends ReposiliteTestSpecification {
     void shouldFalseIfFileIsNotAvailable() throws Exception {
         super.reposilite.getAuth().createToken('path', 'alias', 'rw', 'secret')
 
-        executeOnLocked(new File(super.workingDirectory, 'tokens.dat'), {
+        executeOnLocked(new File(super.WORKING_DIRECTORY, 'tokens.dat'), {
             assertFalse executeCommand('revoke alias')
         })
 

@@ -89,8 +89,15 @@ public final class Configuration {
     @Description({
     "",
     "# Repositories, in the order in which they will be searched.",
+    "# Repository names must mete the following criteria:",
+    "#   No '-': This denotes a suffix for filtering.",
+    "#   Lowercase: To prevent ambiguity in requests.",
+    "#   Neither `releases` or `snapshots`: Reserved for multi-repo views.",
+    "# Names may have a `-releases` or `-snapshots` suffix, if they do they will be",
+    "# considered for the special multi-repo views.",
+    "#",
     "# repositories {",
-    "#   releases {",
+    "#   main {",
     "#     # Prefix of paths that this repo will allow.",
     "#     # May be empty to allow all paths",
     "#     prefixes: []",
@@ -116,8 +123,8 @@ public final class Configuration {
     "# }"
     })
     public LinkedHashMap<String, Repository> repositories = new LinkedHashMap<String, Repository>() {{
-        put("releases", new Repository());
-        put("snapshots", new Repository());
+        put("main-releases", new Repository());
+        put("main-snapshots", new Repository());
     }};
 
     public static class Repository {

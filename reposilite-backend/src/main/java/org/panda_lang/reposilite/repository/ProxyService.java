@@ -29,7 +29,6 @@ import org.panda_lang.reposilite.ReposiliteContext;
 import org.panda_lang.reposilite.ReposiliteException;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
-import org.panda_lang.reposilite.utils.ArrayUtils;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
@@ -63,27 +62,20 @@ final class ProxyService {
         this.httpRequestFactory = new NetHttpTransport().createRequestFactory();
     }
 
-    Result<LookupResponse, ErrorDto> findProxied(ReposiliteContext context) {
-        String uri = context.filepath();
-        String[] requestedPath = uri.split("/");
+    Result<LookupResponse, ErrorDto> findProxied(ReposiliteContext context, IRepository repo, String[] pathParts) {
+        Collection<String> proxies = repo.getProxies();
 
         // /groupId/artifactId/<content>
-        if (requestedPath.length < 3) {
+        if (pathParts.length < 3)
             return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Invalid proxied request"));
-        }
 
-        String filename = requestedPath[requestedPath.length - 1];
-        String remoteUri = uri;
-        Collection<String> proxies = context.repo().getProxies();
-
-        if (proxies.isEmpty())
-            return Result.error(new ErrorDto(HttpStatus.SC_NOT_FOUND, "Artifact " + filename + " not found"));
+        String path = context.filepath();
 
         Future<Result<LookupResponse, ErrorDto>> future = ioService.submit(() -> {
             for (String proxied : proxies) { // TODO: Rewrite all this
                 try {
                     // TODO: Check for HEAD request, so that a HEAD to us doesn't result in a full GET to them
-                    HttpRequest remoteRequest = httpRequestFactory.buildGetRequest(new GenericUrl(proxied + remoteUri));
+                    HttpRequest remoteRequest = httpRequestFactory.buildGetRequest(new GenericUrl(proxied + path));
                     remoteRequest.setThrowExceptionOnExecuteError(false);
                     remoteRequest.setConnectTimeout(proxyConnectTimeout * 1000);
                     remoteRequest.setReadTimeout(proxyReadTimeout * 1000);
@@ -101,9 +93,8 @@ final class ProxyService {
                     }
 
                     long contentLength = headers.getContentLength() == null ? 0 : headers.getContentLength();
-                    String[] path = remoteUri.split("/");
 
-                    FileDetailsDto fileDetails = new FileDetailsDto(FileDetailsDto.FILE, ArrayUtils.getLast(path), "", remoteResponse.getContentType(), contentLength);
+                    FileDetailsDto fileDetails = new FileDetailsDto(FileDetailsDto.FILE, pathParts[pathParts.length - 1], "", remoteResponse.getContentType(), contentLength);
                     LookupResponse response = new LookupResponse(fileDetails);
 
                     if (context.method().equals("HEAD")) {
@@ -117,14 +108,14 @@ final class ProxyService {
                     }
                     */
 
-                    return store(context, remoteUri, remoteResponse);
+                    return store(context, repo, path, remoteResponse);
                 }
                 catch (Exception exception) {
                     String message = "Proxied repository " + proxied + " is unavailable due to: " + exception.getMessage();
                     Reposilite.getLogger().error(message);
 
                     if (!(exception instanceof SocketTimeoutException)) {
-                        errorHandler.accept(remoteUri, new ReposiliteException(message, exception));
+                        errorHandler.accept(path, new ReposiliteException(message, exception));
                     }
                 }
             }
@@ -135,30 +126,28 @@ final class ProxyService {
         try {
             return future.get();
         } catch (InterruptedException | ExecutionException e) {
-            errorHandler.accept(remoteUri, e);
+            errorHandler.accept(path, e);
             return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Error while resolving proxied artifact");
         }
     }
 
-    private Result<LookupResponse, ErrorDto> store(ReposiliteContext context, String uri, HttpResponse remoteResponse) {
-        IQuota diskQuota = repos.getQuota();
+    private Result<LookupResponse, ErrorDto> store(ReposiliteContext context, IRepository repo, String uri, HttpResponse remoteResponse) {
+        IQuota quota = repo.getQuota();
 
-        if (!diskQuota.notFull()) {
+        if (!quota.hasSpace()) {
             Reposilite.getLogger().warn("Out of disk space - Cannot store proxied artifact " + uri);
             return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Artifact not found in local and remote repository");
         }
 
-        IRepository repository = context.repo();
-
         //TODO: Design a better API for this, so we don't have to cast to internal types.
         CompletableFuture<Result<LookupResponse, ErrorDto>> future = ((RepositoryManager)repos).storeFile(
             uri,
-            repository,
+            repo,
             context.filepath(),
             remoteResponse::getContent,
             () -> {
-                File file = repository.getFile(context.filepath());
-                Reposilite.getLogger().info("Stored proxied " + context.filepath() + " in " + repository + " from " + remoteResponse.getRequest().getUrl());
+                File file = repo.getFile(context.filepath());
+                Reposilite.getLogger().info("Stored proxied " + context.filepath() + " in " + repo + " from " + remoteResponse.getRequest().getUrl());
                 context.result(outputStream -> FileUtils.copyFile(file, outputStream));
                 return new LookupResponse(FileDetailsDto.of(file));
             },

@@ -31,10 +31,12 @@ import io.javalin.http.Context;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public final class ReposiliteContext {
-    public static ReposiliteContext create(IAuthManager auth, IRepositoryManager repos, String ipHeader, Context context) {
+    public static ReposiliteContext create(IAuthManager auth, IRepositoryManager repoManager, String ipHeader, Context context) {
         Map<String, String> headers = context.headerMap(); // this can only be called once with a valid result for some reason, so cache it here
         String realIp = context.header(ipHeader);
         String address = StringUtils.isEmpty(realIp) ? context.req.getRemoteAddr() : realIp;
@@ -45,67 +47,155 @@ public final class ReposiliteContext {
             uri = uri.substring(5);
         else if (uri.equals("/api"))
             uri = "";
-        String normalized = ReposiliteUtils.normalizeUri(repos, uri).getOrNull();
 
-        //TODO: check auth and only list repos we have access to
-        IRepository repo = null;
+        View view = View.NONE;
         String filepath = null;
-        if (normalized != null) {
-            int idx = normalized.indexOf('/');
-            if (idx != -1) {
-                repo = repos.getRepo(normalized.substring(0, idx));
-                filepath = normalized.substring(idx + 1);
+        String sanitized = sanitize(uri);
+        List<IRepository> repos = new ArrayList<>();
+
+        if (sanitized != null) {
+            int idx = sanitized.indexOf('/');
+            if (idx == -1) {
+                filepath = sanitized;
+                view = View.ALL;
+                repos.addAll(repoManager.getRepos());
+            } else {
+                String name = sanitized.substring(0, idx);
+                if ("releases".equals(name)) {
+                    view = View.RELEASES;
+                    repoManager.getRepos().stream()
+                    .filter(r -> r.getName().indexOf('-') == -1 || r.getName().endsWith("-releases"))
+                    .forEach(repos::add);
+                } else if ("snapshots".equals(name)) {
+                    view = View.SNAPSHOTS;
+                    repoManager.getRepos().stream()
+                    .filter(r -> r.getName().indexOf('-') == -1 || r.getName().endsWith("-snapshots"))
+                    .forEach(repos::add);
+                } else {
+                    IRepository repo = repoManager.getRepo(name);
+                    if (repo == null) {
+                        view = View.ALL;
+                        repos.addAll(repoManager.getRepos());
+                    } else {
+                        view = View.EXPLICIT;
+                        repos.add(repo);
+                    }
+                }
+                if (view != View.ALL)
+                    filepath = sanitized.substring(idx + 1);
+                else
+                    filepath = sanitized;
             }
         }
 
         return new ReposiliteContext(
             context.req.getRequestURI(),
-            normalized,
+            sanitized,
             filepath,
             context.method(),
             address,
             headers,
             context.req::getInputStream,
-            repo,
+            repos,
             auth,
-            session
+            session,
+            view
         );
     }
 
+    static String sanitize(String url) {
+        if (url.isEmpty())
+            return url;
+
+        int idx = -1;
+        while (++idx < url.length() && url.charAt(idx) == '/'); // TODO: 404 on multiple consecutive slashes.
+        if (idx != 0)
+            url = url.substring(idx);
+
+
+        if (url.contains("..") || url.contains("~") || url.contains(":") || url.contains("\\"))
+            return null;
+
+        if ("releases".equals(url) || "snapshots".equals(url))
+            return url + '/';
+
+        return url;
+    }
+
+    /**
+     * Process uri applying following changes:
+     *
+     * <ul>
+     *     <li>Remove root slash</li>
+     *     <li>Remove illegal path modifiers like .. and ~</li>
+     *     <li>Insert repository name if missing</li>
+     * </ul>
+     *
+     * @param rewritePathsEnabled determines if path rewriting is enabled
+     * @param uri the uri to process
+     * @return the normalized uri
+     */
+    /*
+    static Option<String> normalizeUri(IRepositoryManager repos, String uri) {
+        uri = sanitize(uri);
+        if (uri == null)
+            return Option.none();
+
+        int idx = uri.indexOf('/');
+        if (idx == -1)
+            return Option.of(uri);
+
+        String first = uri.substring(0, idx);
+        if (repos.getRepo(first) != null)
+            return Option.of(uri);
+
+        for (IRepository repo : repos.getRepos()) {
+            if (repo.canContain(uri))
+                return Option.of(repo.getName() + '/' + uri);
+        }
+
+        // If all else fails, fallback to the input uri
+        return Option.of(uri);
+    }
+    */
+
     private final String uri;
-    private final String normalized;
+    private final String sanitized;
     private final String filepath;
     private final String method;
     private final String address;
     private final Map<String, String> header;
     private final ThrowingSupplier<InputStream, IOException> input;
-    private final IRepository repo;
+    private final List<IRepository> repos;
     private final IAuthManager auth;
     private final Result<Session, String> session;
+    private final View view;
     private ThrowingConsumer<OutputStream, IOException> result;
 
     private ReposiliteContext(
             String uri,
-            String normalized,
+            String sanitized,
             String filepath,
             String method,
             String address,
             Map<String, String> header,
             ThrowingSupplier<InputStream, IOException> input,
-            IRepository repo,
+            List<IRepository> repos,
             IAuthManager auth,
-            Result<Session, String> session) {
+            Result<Session, String> session,
+            View view) {
 
         this.uri = uri;
-        this.normalized = normalized;
+        this.sanitized = sanitized;
         this.filepath = filepath;
         this.method = method;
         this.address = address;
         this.header = header;
         this.input = input;
-        this.repo = repo;
+        this.repos = repos;
         this.auth = auth;
         this.session = session;
+        this.view = view;
     }
 
     public void result(ThrowingConsumer<OutputStream, IOException> result) {
@@ -136,16 +226,16 @@ public final class ReposiliteContext {
         return uri;
     }
 
-    public String normalized() {
-        return normalized;
+    public String sanitized() {
+        return sanitized;
     }
 
     public String filepath() {
         return filepath;
     }
 
-    public IRepository repo() {
-        return repo;
+    public List<IRepository> repos() {
+        return repos;
     }
 
     public IAuthManager auth() {
@@ -153,10 +243,27 @@ public final class ReposiliteContext {
     }
 
     public Result<Session, String> session() {
-        return this.session;
+        return session;
     }
 
     public Result<Session, String> session(String url) {
         return session.flatMap(s -> s.hasPermissionTo(url) ? Result.ok(s) : Result.error("Unauthorized access attempt"));
+    }
+
+    public View view() {
+        return view;
+    }
+
+    public enum View {
+        // Specified an explicit repo, this one only.
+        EXPLICIT,
+        // A view of releases only, may be multiple repos
+        RELEASES,
+        // A view of snapshots only, may be multiple repos
+        SNAPSHOTS,
+        // A view of everything, most likely multiple repos
+        ALL,
+        // You asked for something weird so you get nothing!
+        NONE
     }
 }

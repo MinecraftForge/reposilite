@@ -19,11 +19,11 @@ package org.panda_lang.reposilite.repository;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
+import org.panda_lang.reposilite.ReposiliteContext.View;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
-import org.panda_lang.reposilite.metadata.MetadataService;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
@@ -41,14 +41,28 @@ final class DeployService {
     }
 
     public Result<CompletableFuture<Result<FileDetailsDto, ErrorDto>>, ErrorDto> deploy(ReposiliteContext context) {
-        String uri = context.normalized();
+        String uri = context.filepath();
         if (uri == null) {
             return ResponseUtils.error(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path");
         }
 
-        IRepository repo = context.repo();
+        IRepository repo = null;
+        if (!context.repos().isEmpty()) {
+            if (context.view() == View.EXPLICIT) {
+                repo = context.repos().get(0);
+            } else if (context.view() != View.RELEASES && context.view() != View.SNAPSHOTS) {
+                return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Deploying to unknown endpoint. Must be a explicit repo, '/releases', or '/snapshots'");
+            } else {
+                for (IRepository r : context.repos()) {
+                    if (r.canContain(uri)) {
+                        repo = r;
+                        break;
+                    }
+                }
+            }
+        }
         if (repo == null) {
-            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + uri);
+            return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.uri());
         }
 
         if (repo.isReadOnly()) {
@@ -59,7 +73,7 @@ final class DeployService {
             return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Repository " + repo.getName() + " can not contain: " + context.filepath());
         }
 
-        Result<Session, String> authResult = context.session(uri);
+        Result<Session, String> authResult = context.session(repo.getName() + '/' + uri);
 
         if (authResult.isErr()) {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, authResult.getError());
@@ -71,7 +85,7 @@ final class DeployService {
             return ResponseUtils.error(HttpStatus.SC_UNAUTHORIZED, "Cannot deploy artifact without write permission");
         }
 
-        if (!repo.getQuota().notFull()) {
+        if (!repo.getQuota().hasSpace()) {
             return ResponseUtils.error(HttpStatus.SC_INSUFFICIENT_STORAGE, "Out of disk space");
         }
 

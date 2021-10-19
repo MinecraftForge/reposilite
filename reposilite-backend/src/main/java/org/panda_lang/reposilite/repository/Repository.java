@@ -27,6 +27,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.panda_lang.reposilite.Reposilite;
+import org.panda_lang.reposilite.utils.FilesUtils;
 
 final class Repository implements IRepository {
     private final String name;
@@ -62,12 +63,12 @@ final class Repository implements IRepository {
     }
 
     @Override
-    public boolean contains(String... path) {
+    public boolean contains(String path) {
         File targetFile = getFile(path);
 
         // TODO: Checks if length < 3 because it was checking for artifact info group:name:version
         // But that was dirty and dumb, we can do better
-        if (!targetFile.exists() || targetFile.isDirectory() || path.length < 3)
+        if (!targetFile.exists() || targetFile.isDirectory())
             return false;
 
         return true;
@@ -75,6 +76,8 @@ final class Repository implements IRepository {
 
     @Override
     public File getFile(String... path) {
+        if (path.length == 1)
+            return new File(this.root, path[0]);
         return new File(this.root, Arrays.stream(path).collect(Collectors.joining(File.separator)));
     }
 
@@ -136,6 +139,29 @@ final class Repository implements IRepository {
         return false;
     }
 
+    @Override
+    public boolean isDirectory(String path) {
+        if (path == null || path.isEmpty())
+            return true;
+
+        if (!this.prefixes.isEmpty()) {
+            String test = path + '/';
+            for (String prefix : this.prefixes) {
+                if (prefix.startsWith(test))
+                    return true;
+            }
+        }
+
+        File file = getFile(path);
+        return file.exists() && file.isDirectory();
+
+    }
+
+    @Override
+    public String toString() {
+        return "Repository[" + getName() + "]";
+    }
+
     static class Builder implements IRepository.Builder {
         private final String name;
         private List<String> prefixes = new ArrayList<>();
@@ -148,8 +174,7 @@ final class Repository implements IRepository {
         protected Supplier<File> directory;
 
         Builder(String name) {
-            if (name.indexOf('/') != -1 || name.indexOf('\\') != -1 || name.contains(".."))
-                throw new IllegalArgumentException("Invalid repository name: " + name);
+            FilesUtils.validateRepositoryName(name);
             this.name = name;
             this.directory = () -> new File("./repositories/" + name);
         }

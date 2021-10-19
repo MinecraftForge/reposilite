@@ -44,8 +44,8 @@ class SessionTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo("releases", {})
-            .repo("snapshots", {})
+            .repo("main-releases", {})
+            .repo("main-snapshots", {})
             .build();
     }
 
@@ -83,12 +83,12 @@ class SessionTest {
         assertTrue signin.isOk()
         def wildcardSession = signin.get()
 
-        assertTrue wildcardSession.hasPermissionTo('/releases/b/c')
-        assertTrue wildcardSession.hasPermissionTo('/releases/b/c/d')
-        assertTrue wildcardSession.hasPermissionTo('/snapshots/b/c')
+        assertTrue wildcardSession.hasPermissionTo('/main-releases/b/c')
+        assertTrue wildcardSession.hasPermissionTo('/main-releases/b/c/d')
+        assertTrue wildcardSession.hasPermissionTo('/main-snapshots/b/c')
 
-        assertFalse wildcardSession.hasPermissionTo('/releases/b')
-        assertFalse wildcardSession.hasPermissionTo('/snapshots/b')
+        assertFalse wildcardSession.hasPermissionTo('/main-releases/b')
+        assertFalse wildcardSession.hasPermissionTo('/main-snapshots/b')
         assertFalse wildcardSession.hasPermissionTo('/custom/b/c')
     }
 
@@ -106,17 +106,17 @@ class SessionTest {
 
         assertTrue standardRootSession.hasPermissionTo('/')
         assertFalse wildcardRootSession.hasPermissionTo('/')
-        assertTrue wildcardRootSession.hasPermissionTo('/releases')
-        assertTrue wildcardRootSession.hasPermissionTo('/snapshots')
+        assertTrue wildcardRootSession.hasPermissionTo('/main-releases')
+        assertTrue wildcardRootSession.hasPermissionTo('/main-snapshots')
     }
 
     @Test
-    void 'should contain repository from path' () {
-        def token = AUTH_MANAGER.createToken('/releases', 'alias', 'rw', 'token')
+    void 'should contain only authorized repositories' () {
+        def token = AUTH_MANAGER.createToken('/main-releases', 'alias', 'rw', 'token')
         def signin = AUTH_MANAGER.getSession('alias:token')
         assertTrue signin.isOk()
         def session = signin.get()
-        assertEquals Collections.singletonList(REPOSITORY_MANAGER.getRepo('releases')), session.getRepositories()
+        assertEquals Collections.singletonList(REPOSITORY_MANAGER.getRepo('main-releases')), session.getRepositories()
     }
 
     @Test

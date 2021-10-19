@@ -22,8 +22,8 @@ import io.javalin.plugin.openapi.annotations.OpenApiContent;
 import io.javalin.plugin.openapi.annotations.OpenApiParam;
 import io.javalin.plugin.openapi.annotations.OpenApiResponse;
 import org.apache.http.HttpStatus;
-import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
+import org.panda_lang.reposilite.ReposiliteContext.View;
 import org.panda_lang.reposilite.auth.IAuthedHandler;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
@@ -33,10 +33,10 @@ import org.panda_lang.reposilite.metadata.MetadataUtils;
 import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
-import org.panda_lang.utilities.commons.function.PandaStream;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -76,18 +76,18 @@ final class LookupApiEndpoint implements IAuthedHandler {
             ),
         }
     )
+    // TODO: Return error/file details instead of FileList if requesting path not ending in / ?
     @Override
     public void handle(Context ctx, ReposiliteContext context) {
         //Reposilite.getLogger().info("API " + context.uri() + " from " + context.address());
 
-        if (context.normalized() == null) {
+        String filepath = context.filepath();
+        if (filepath == null) {
             ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path"));
             return;
         }
 
-        String uri = context.normalized();
-
-        if ("/".equals(uri) || StringUtils.isEmpty(uri)) {
+        if ("/".equals(context.sanitized()) || StringUtils.isEmpty(context.sanitized())) {
             Option<Session> session = context.session().toOption();
             List<IRepository> viewable = repos.getRepos().stream()
                 .filter(repo -> (repo.canBrowse() && !repo.isHidden()) || session.map(value -> value.getRepositories().contains(repo)).orElseGet(false))
@@ -108,22 +108,21 @@ final class LookupApiEndpoint implements IAuthedHandler {
             return;
         }
 
-        IRepository repo = context.repo();
+        if (context.view() != View.EXPLICIT && context.view() != View.ALL) {
+            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_IMPLEMENTED, "Can not browse API in merged views. Must specify a repository"));
+            return;
+        }
+
+        IRepository repo = context.view() == View.ALL || context.repos().isEmpty() ? null : context.repos().get(0);
         if (repo == null) {
-            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + uri));
+            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.sanitized()));
             return;
         }
 
         if (!repo.canBrowse() || repo.isHidden()) {
-            Result<Session, String> auth = context.session(uri);
-            if (auth.isErr()) {
-                ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.getError());
-                return;
-            }
-
-            if ((!StringUtils.isEmpty(uri) && !"/".equals(uri) && !auth.get().hasPermissionTo('/' + uri))
-                || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
-                ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, "Unauthorized request");
+            Result<Session, String> auth = context.session('/' + repo.getName() + '/' + filepath);
+            if (auth.isErr() || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
+                ResponseUtils.errorResponse(ctx, HttpStatus.SC_UNAUTHORIZED, auth.isErr() ? auth.getError() : "Unauthorized request");
                 return;
             }
         }
@@ -146,9 +145,13 @@ final class LookupApiEndpoint implements IAuthedHandler {
             return;
         }
 
-        ctx.json(new FileListDto(PandaStream.of(FilesUtils.listFiles(requestedFile))
+        ctx.json(new FileListDto(Arrays.stream(FilesUtils.listFiles(requestedFile))
+                .sorted((a,b) -> {
+                    if (a.isDirectory() != b.isDirectory())
+                        return a.isDirectory() ? -1 : 1;
+                    return a.getName().compareTo(b.getName());
+                })
                 .map(FileDetailsDto::of)
-                .transform(stream -> MetadataUtils.toSorted(stream, FileDetailsDto::getName, FileDetailsDto::isDirectory))
                 .toList()));
     }
 

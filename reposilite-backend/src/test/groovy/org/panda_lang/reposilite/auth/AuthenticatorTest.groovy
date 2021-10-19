@@ -45,8 +45,6 @@ class AuthenticatorTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo("releases", {})
-            .repo("snapshots", {})
             .build()
     }
 

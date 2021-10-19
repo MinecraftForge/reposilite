@@ -1,90 +1,59 @@
-/*
- * Copyright (c) 2020 Dzikoysk
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 import org.panda_lang.reposilite.ReposiliteTestSpecification
-import org.panda_lang.reposilite.metadata.MetadataService
+import org.panda_lang.reposilite.repository.RepositoryManager
 import org.panda_lang.utilities.commons.function.Result
 
-import static org.junit.jupiter.api.Assertions.assertEquals
-import static org.junit.jupiter.api.Assertions.assertTrue
+import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
 final class MetadataServiceTest extends ReposiliteTestSpecification {
     @Test
-    void 'should return bad request' () {
-        def result = generate("org", "panda-lang", "reposilite-test", "1.0.0", "reposilite-test-1.0.0.jar", "reposilite-test-1.0.0.jar")
-        assertEquals "Bad request", result.getError()
+    void 'should error on invalid name' () {
+        assertThrows IllegalArgumentException.class, {
+            generate('reposilite/test/not-maven-metdata.xml')
+        }
     }
 
     @Test
-    void 'should not generate invalid file' () {
-        def result = generate("org", "panda-lang", "reposilite-test")
-        assertTrue result.isErr()
-        assertEquals "Bad request", result.getError()
+    void 'should not generate if no files exist' () {
+        assertNull generate('reposilite/missing/maven-metadata.xml')
     }
 
     @Test
-    void 'should return artifact metadata content' () {
-        def result = generate("org", "panda-lang", "reposilite-test", "maven-metadata.xml")
+    void 'should merge artifact version list' () {
+        def result = generate('reposilite/test/maven-metadata.xml')
 
-        assertTrue result.isOk()
-        assertTrue result.get().contains("1.0.0")
-        assertTrue result.get().contains("1.0.0-SNAPSHOT")
-        assertTrue result.get().contains("1.0.1-SNAPSHOT")
-    }
-
-    @Test
-    void 'should return builds not found' () {
-        Result<String, String> result = generate("org", "panda-lang", "reposilite-test", "1.0.2-SNAPSHOT", "maven-metadata.xml")
-        assertEquals "Latest build not found", result.getError()
+        assertNotNull result
+        assertTrue result.contains('1.0.0')
+        assertTrue result.contains('1.0.1')
+        assertTrue result.contains('1.0.0-SNAPSHOT')
+        assertTrue result.contains('1.0.1-SNAPSHOT')
     }
 
     @Test
     void 'should return snapshot metadata content' () {
-        def result = generate("org", "panda-lang", "reposilite-test", "1.0.0-SNAPSHOT", "maven-metadata.xml")
-        assertTrue result.isOk()
-        assertTrue result.get().contains("1.0.0-SNAPSHOT")
-        assertTrue result.get().contains("<buildNumber>1</buildNumber>")
-        assertTrue result.get().contains("<timestamp>20200603.224843</timestamp>")
-        assertTrue result.get().contains("<extension>pom</extension>")
-        assertTrue result.get().contains("<value>1.0.0-20200603.224843-1</value>")
-    }
-
-    @Test
-    void 'should return fake snapshot metadata content' () {
-        def result = generate("org", "panda-lang", "reposilite-test", "1.0.1-SNAPSHOT", "maven-metadata.xml")
-        assertTrue result.isOk()
-        assertTrue result.get().contains("<release>1.0.1-SNAPSHOT</release>")
-        assertTrue result.get().contains("<latest>1.0.1-SNAPSHOT</latest>")
-        assertTrue result.get().contains("<version>1.0.1-SNAPSHOT</version>")
+        def timestamp = '20211016.230946'
+        def result = generate('reposilite/test/1.0.0-SNAPSHOT/maven-metadata.xml')
+        assertNotNull result
+        assertTrue result.contains('1.0.0-SNAPSHOT')
+        assertTrue result.contains('<buildNumber>1</buildNumber>')
+        assertTrue result.contains('<timestamp>' + timestamp + '</timestamp>')
+        assertTrue result.contains('<extension>pom</extension>')
+        assertTrue result.contains('<value>1.0.0-' + timestamp + '-1</value>')
     }
 
     @Test
     void 'should clear cache' () {
-        String[] path = [ "org", "panda-lang", "reposilite-test", "maven-metadata.xml" ]
+        def path = 'reposilite/test/maven-metadata.xml'
         generate(path)
 
         def metadataService = metadata()
         assertEquals 1, metadataService.getCacheSize()
 
-        metadataService.clearMetadata(super.reposilite.getRepos().getRepo("releases").getFile(path))
+        metadataService.clearMetadata(super.reposilite.getRepos().getRepo('main-releases').getFile(path))
         assertEquals 0, metadataService.getCacheSize()
     }
 
@@ -95,7 +64,7 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
         assertEquals 0, metadataService.getCacheSize()
 
         generateAll()
-        assertEquals 4, metadataService.purgeCache()
+        assertEquals 3, metadataService.purgeCache()
         assertEquals 0, metadataService.getCacheSize()
     }
 
@@ -105,15 +74,14 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
         assertEquals 0, metadataService.getCacheSize()
 
         generateAll()
-        assertEquals 4, metadataService.getCacheSize()
+        assertEquals 3, metadataService.getCacheSize()
     }
 
     private void generateAll() {
-        generate "org", "panda-lang", "reposilite-test", "maven-metadata.xml"
-        generate "org", "panda-lang", "reposilite-test", "1.0.0", "maven-metadata.xml"
-        generate "org", "panda-lang", "reposilite-test", "1.0.0-SNAPSHOT", "maven-metadata.xml"
-        generate "org", "panda-lang", "reposilite-test", "1.0.1", "maven-metadata.xml" // should not generate this one (empty dir)
-        generate "org", "panda-lang", "reposilite-test", "1.0.1-SNAPSHOT", "maven-metadata.xml"
+        generate 'reposilite/test/maven-metadata.xml'
+        generate 'reposilite/test/1.0.0-SNAPSHOT/maven-metadata.xml'
+        generate 'reposilite/test/1.0.1-SNAPSHOT/maven-metadata.xml'
+        generate 'reposilite/test/1.0.1/maven-metadata.xml' // should not generate this one, releases don't have metadata
     }
 
 
@@ -121,10 +89,12 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
         return ((RepositoryManager)super.reposilite.repos).@metadataService
     }
 
-    private Result<String, String> generate(String... path) {
-        def manager = (RepositoryManager)super.reposilite.repos
-        def releases = manager.getRepo("releases")
-        return manager.@metadataService.generateMetadata(releases, path)
+    private String generate(String path) {
+        def manager = super.reposilite.repos
+        def releases = manager.getRepo('main-releases')
+        def snapshots = manager.getRepo('main-snapshots')
+        def bytes = metadata().mergeMetadata(path, path, [releases, snapshots])
+        return bytes == null ? null : new String(bytes)
     }
 
 }

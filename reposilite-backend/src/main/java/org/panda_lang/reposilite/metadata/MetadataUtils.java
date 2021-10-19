@@ -42,7 +42,7 @@ public final class MetadataUtils {
 
     private MetadataUtils() { }
 
-    public static File[] toSortedBuilds(File artifactDirectory) {
+    static File[] toSortedBuilds(File artifactDirectory) {
         return PandaStream.of(FilesUtils.listFiles(artifactDirectory))
                 .filter(File::isFile)
                 .filter(file -> file.getName().endsWith(".pom"))
@@ -50,7 +50,7 @@ public final class MetadataUtils {
                 .toArray(File[]::new);
     }
 
-    public static File[] toFiles(File directory) {
+    static File[] toFiles(File directory) {
         return PandaStream.of(FilesUtils.listFiles(directory))
                 .filter(File::isFile)
                 .transform(stream -> toSorted(stream, File::getName, File::isDirectory))
@@ -64,7 +64,7 @@ public final class MetadataUtils {
                 .toArray(File[]::new);
     }
 
-    protected static String[] toSortedIdentifiers(String artifact, String version, File[] builds) {
+    static String[] toSortedIdentifiers(String artifact, String version, File[] builds) {
         return PandaStream.of(builds)
                 .map(build -> toIdentifier(artifact, version, build))
                 .filterNot(StringUtils::isEmpty)
@@ -73,7 +73,7 @@ public final class MetadataUtils {
                 .toArray(String[]::new);
     }
 
-    protected static File[] toBuildFiles(File artifactDirectory, String identifier) {
+    static File[] toBuildFiles(File artifactDirectory, String identifier) {
         return PandaStream.of(FilesUtils.listFiles(artifactDirectory))
                 .filter(file -> file.getName().contains(identifier + ".") || file.getName().contains(identifier + "-"))
                 .filterNot(file -> file.getName().endsWith(".md5"))
@@ -89,7 +89,7 @@ public final class MetadataUtils {
                 .map(Pair::getKey);
     }
 
-    public static String toIdentifier(String artifact, String version, File build) {
+    static String toIdentifier(String artifact, String version, File build) {
         String identifier = build.getName();
         identifier = StringUtils.replace(identifier, "." + FilesUtils.getExtension(identifier), StringUtils.EMPTY);
         identifier = StringUtils.replace(identifier, artifact + "-", StringUtils.EMPTY);
@@ -118,17 +118,17 @@ public final class MetadataUtils {
                 : identifier.substring(0, occurrence);
     }
 
-    protected static String toUpdateTime(File file) {
+    static String toUpdateTime(File file) {
         return TIMESTAMP_FORMATTER.format(Instant.ofEpochMilli(file.lastModified()));
     }
 
-    public static String toGroup(String[] elements) {
+    static String toGroup(String[] elements) {
         return Joiner.on(".")
                 .join(Arrays.copyOfRange(elements, 0, elements.length), value -> value.contains(".") ? value.replace(".", ESCAPE_DOT) : value)
                 .toString();
     }
 
-    protected static String toGroup(String[] elements, int toShrink) {
+    static String toGroup(String[] elements, int toShrink) {
         return toGroup(shrinkGroup(elements, toShrink)).replace(ESCAPE_DOT, ".");
     }
 

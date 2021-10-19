@@ -51,7 +51,7 @@ class KeygenCommandTest extends ReposiliteTestSpecification {
     void 'should false if file is not available' () {
         super.reposilite.getAuth().createToken('/', 'alias', 'rwm', 'password')
 
-        executeOnLocked(new File(super.workingDirectory, 'tokens.dat'), {
+        executeOnLocked(new File(super.WORKING_DIRECTORY, 'tokens.dat'), {
             assertFalse executeCommand('keygen /a/b/c alias rw')
         })
 

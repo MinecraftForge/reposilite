@@ -23,7 +23,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.panda_lang.reposilite.ReposiliteConfiguration;
-import org.panda_lang.reposilite.metadata.MetadataService;
 import org.panda_lang.utilities.commons.function.Result;
 import org.panda_lang.utilities.commons.function.ThrowingRunnable;
 import org.panda_lang.utilities.commons.function.ThrowingSupplier;
@@ -93,7 +92,7 @@ class RepositoryManager implements IRepositoryManager {
 
         ProxyService proxyService = new ProxyService(this, jctx.config().proxyConnectTimeout, jctx.config().proxyReadTimeout, this.executor, this.errorHandler);
         LookupService lookupService = new LookupService(metadataService, this, proxyService);
-        Handler lookupController = jctx.authedToHandler(new LookupEndpoint(this, jctx.frontend(), lookupService, errorHandler));
+        Handler lookupController = jctx.authedToHandler(new LookupEndpoint(jctx.frontend(), lookupService, errorHandler));
 
         jctx.javalin()
             .get("/*", lookupController)

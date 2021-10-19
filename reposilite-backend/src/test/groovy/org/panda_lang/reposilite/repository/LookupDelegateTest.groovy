@@ -1,9 +1,10 @@
 package org.panda_lang.reposilite.repository
 
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.ReposiliteConstants
 import org.panda_lang.reposilite.ReposiliteContext
@@ -21,11 +22,12 @@ import static org.junit.jupiter.api.Assertions.*
 
 //TODO: Restructure integration tests so that each test can have its own config
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 final class LookupDelegateTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'reposilite.repositories':                   'releases,delegate',
-            'reposilite.repositories.releases.delegate': 'delegate'
+            'repositories':                        'main-releases,delegate',
+            'repositories.main-releases.delegate': 'delegate'
         ])
     }
     private static final String FILE_PATH = '/delegated/artifact/version/file'
@@ -41,7 +43,7 @@ final class LookupDelegateTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 200 and delegated file from releases request' () {
-        def content = shouldReturnData(SC_OK, '/releases' + FILE_PATH)
+        def content = shouldReturnData(SC_OK, '/main-releases' + FILE_PATH)
         assertEquals FILE_CONTENT, content
     }
 

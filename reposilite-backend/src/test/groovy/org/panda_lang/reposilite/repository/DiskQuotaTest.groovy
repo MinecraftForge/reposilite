@@ -36,13 +36,13 @@ final class DiskQuotaTest {
 
         assertTrue size > 0
         assertEquals 0, quota.@usage.longValue()
-        assertTrue quota.notFull()
+        assertTrue quota.hasSpace()
 
         quota.allocate(1)
-        assertTrue quota.notFull()
+        assertTrue quota.hasSpace()
 
         quota.allocate(size)
-        assertFalse quota.notFull()
+        assertFalse quota.hasSpace()
     }
 
     @Test
@@ -52,13 +52,13 @@ final class DiskQuotaTest {
 
         assertEquals size, quota.@quota.longValue()
         assertEquals 0, quota.@usage.longValue()
-        assertTrue quota.notFull()
+        assertTrue quota.hasSpace()
 
         quota.allocate(1)
-        assertTrue quota.notFull()
+        assertTrue quota.hasSpace()
 
         quota.allocate(size)
-        assertFalse quota.notFull()
+        assertFalse quota.hasSpace()
     }
 
 }

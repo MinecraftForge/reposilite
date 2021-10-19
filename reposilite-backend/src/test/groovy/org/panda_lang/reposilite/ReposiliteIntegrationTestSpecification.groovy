@@ -16,14 +16,15 @@
 
 package org.panda_lang.reposilite
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.json.JsonMapper
+import com.fasterxml.jackson.module.paranamer.ParanamerModule
 import com.google.api.client.http.GenericUrl
 import com.google.api.client.http.HttpRequest
 import com.google.api.client.http.HttpRequestFactory
 import com.google.api.client.http.HttpResponse
 import com.google.api.client.http.javanet.NetHttpTransport
 import groovy.transform.CompileStatic
-import net.dzikoysk.cdn.CdnFactory
-import net.dzikoysk.cdn.model.Configuration
 
 import org.apache.commons.io.FileUtils
 import org.junit.jupiter.api.AfterEach
@@ -39,8 +40,9 @@ import static org.junit.jupiter.api.Assertions.*
 @CompileStatic
 abstract class ReposiliteIntegrationTestSpecification {
 
-    public static final String PORT = String.valueOf(new Random().nextInt(16383) + 49151)
-    public static final HttpRequestFactory REQUEST_FACTORY = new NetHttpTransport().createRequestFactory()
+    protected static final String PORT = String.valueOf(new Random().nextInt(16383) + 49151)
+    protected static final HttpRequestFactory REQUEST_FACTORY = new NetHttpTransport().createRequestFactory()
+    protected static final ObjectMapper JSON_MAPPER = new JsonMapper().registerModule(new ParanamerModule());
 
     @TempDir
     protected File WORKING_DIRECTORY
@@ -58,7 +60,7 @@ abstract class ReposiliteIntegrationTestSpecification {
     protected Reposilite reposilite(File workingDirectory, String... args) {
         FileUtils.copyDirectory(new File("src/test/workspace/repositories"), new File(workingDirectory, "repositories"))
         System.setProperty('reposilite.port', PORT)
-        properties.forEach({ property, value -> System.setProperty(property, value) })
+        properties.forEach({ key, value -> System.setProperty('reposilite.' + key, value) })
 
         try {
             return ReposiliteLauncher.create(ArrayUtils.merge(args, ArrayUtils.of(
@@ -68,7 +70,7 @@ abstract class ReposiliteIntegrationTestSpecification {
         }
         finally {
             System.clearProperty('reposilite.port')
-            properties.forEach({ key, value -> System.clearProperty(key) })
+            properties.forEach({ key, value -> System.clearProperty('reposilite.' + key) })
         }
     }
 
@@ -78,8 +80,13 @@ abstract class ReposiliteIntegrationTestSpecification {
     }
 
     protected static HttpResponse getRequest(String uri) {
+        return getRequest(uri, true);
+    }
+
+    protected static HttpResponse getRequest(String uri, boolean followRedirects) {
         return REQUEST_FACTORY.buildGetRequest(url(uri))
                 .setThrowExceptionOnExecuteError(false)
+                .setFollowRedirects(followRedirects)
                 .execute()
     }
 
@@ -104,16 +111,16 @@ abstract class ReposiliteIntegrationTestSpecification {
         return response.parseAsString()
     }
 
-    protected static Configuration shouldReturnJson(int status, String uri) {
-        return CdnFactory.createJson().load(shouldReturnData(status, uri))
+    protected static LinkedHashMap<String, ?> shouldReturnJson(int status, String uri) {
+        return (LinkedHashMap<String, ?>)JSON_MAPPER.readValue(shouldReturnData(status, uri), Object.class)
     }
 
-    protected static Configuration shouldReturnJson(int status, String uri, Pair<String, Token> token) {
-        return CdnFactory.createJson().load(shouldReturnData(status, uri, token))
+    protected static LinkedHashMap<String, ?> shouldReturnJson(int status, String uri, Pair<String, Token> token) {
+        return (LinkedHashMap<String, ?>)JSON_MAPPER.readValue(shouldReturnData(status, uri, token), Object.class)
     }
 
-    protected static Configuration shouldReturnJson(int status, String uri, String username, String password) {
-        return CdnFactory.createJson().load(shouldReturnData(status, uri, username, password))
+    protected static LinkedHashMap<String, ?> shouldReturnJson(int status, String uri, String username, String password) {
+        return (LinkedHashMap<String, ?>)JSON_MAPPER.readValue(shouldReturnData(status, uri, username, password), Object.class)
     }
 
     protected static HttpResponse getAuthenticated(String uri, String username, String password) {

@@ -1,0 +1,143 @@
+plugins {
+    id 'maven-publish'
+    id 'java'
+}
+
+group 'reposilite'
+
+ext {
+    base_dir = file('repos')
+    filtered_dir = new File(base_dir, 'filtered')
+    releases_dir = new File(base_dir, 'main-releases')
+    snapshots_dir = new File(base_dir, 'main-snapshots')
+    private_dir = new File(base_dir, 'private')
+}
+
+jar {
+    manifest {
+        attributes('Implementation-Title': 'test')
+    }
+}
+
+task preclean() {
+    outputs.upToDateWhen { false }
+    doFirst {
+        [filtered_dir, releases_dir, snapshots_dir, private_dir].each { delete fileTree(it) }
+    }
+}
+jar.finalizedBy(preclean)
+
+// Known file contents to make sure data transfers and isn't corrupt.
+task createKnownData() {
+    ext.FILE = file('build/known.txt')
+    outputs.file FILE
+    doFirst {
+        FILE.text = 'known artifact contents'
+    }
+}
+
+task cleanup() {
+    outputs.upToDateWhen { false }
+    doFirst {
+        [filtered_dir, releases_dir, snapshots_dir, private_dir].each { path ->
+            // We don't care about hashes, but keep .md5 so we can test generically if hashes work for manifest
+            delete fileTree(dir: path, include: '**/*.sha1')
+            delete fileTree(dir: path, include: '**/*.sha256')
+            delete fileTree(dir: path, include: '**/*.sha512')
+            delete fileTree(dir: path, include: '**/*.pom*')
+            delete fileTree(dir: path, include: '**/missing/**/maven-metadata.xml*') // Remove maven-metadata.xml for testing only generating for existing
+        }
+    }
+}
+publish.finalizedBy(cleanup)
+
+publishing {
+    repositories {
+        maven {
+            name 'filtered'
+            url 'file://' + filtered_dir.absolutePath
+        }
+        maven {
+            name 'release'
+            url 'file://' + releases_dir.absolutePath
+        }
+        maven {
+            name 'snapshot'
+            url 'file://' + snapshots_dir.absolutePath
+        }
+        maven {
+            name 'private'
+            url 'file://' + private_dir.absolutePath
+        }
+    }
+    publications {
+        filtered100(MavenPublication) {
+            version = '1.0.0'
+            artifact(createKnownData.FILE) {
+                classifier = 'known'
+                builtBy createKnownData
+            }
+        }
+        releaseMissing100(MavenPublication) {
+            artifactId = 'missing'
+            version = '1.0.0'
+            artifact(createKnownData.FILE) {
+                classifier = 'known'
+                builtBy createKnownData
+            }
+        }
+        release100(MavenPublication) {
+            version = '1.0.0'
+        }
+        release101(MavenPublication) {
+            version = '1.0.1'
+        }
+        snapshotsMissing100(MavenPublication) {
+            artifactId = 'missing'
+            version = '1.0.1' // This isn't a snapshot version, I just want a known file without a timestamp in the snapshots repo
+            artifact(createKnownData.FILE) {
+                classifier = 'known'
+                builtBy createKnownData
+            }
+        }
+        snapshot100(MavenPublication) {
+            version = '1.0.0-SNAPSHOT'
+        }
+        snapshot101(MavenPublication) {
+            version = '1.0.1-SNAPSHOT'
+        }
+        private100(MavenPublication) {
+            artifactId = 'private'
+            version = '1.0.0'
+            artifact(createKnownData.FILE) {
+                classifier = 'known'
+                builtBy createKnownData
+            }
+        }
+    }
+}
+
+afterEvaluate {
+    publishing.publications.each { pub ->
+        if (pub.groupId == project.group && pub.name.startsWith('filtered'))
+            pub.groupId = 'special'
+        if (pub.artifactId == project.name)
+            pub.artifactId = 'test'
+        pub.from components.java
+    }
+    tasks.withType(PublishToMavenRepository) { task ->
+        if (!task.publication.name.startsWith(task.repository.name)) {
+            task.enabled = false
+            task.group = null
+        } else {
+            // TODO  currently all artifacts publish using the same timestamp, figure a way to give them different ones.
+            /*
+            task.doFirst{ 
+                logger.lifecycle('Sleeping')
+                Thread.sleep(10000) 
+            }
+            */
+        }
+    }
+    tasks.withType(GenerateModuleMetadata) { task -> enabled = false } // Disable gradle's .module metadata files. 
+}

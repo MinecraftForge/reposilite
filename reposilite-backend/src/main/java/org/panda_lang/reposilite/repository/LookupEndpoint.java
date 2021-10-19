@@ -36,17 +36,14 @@ import java.io.IOException;
 import java.util.function.BiConsumer;
 
 public final class LookupEndpoint implements IAuthedHandler {
-    private final IRepositoryManager repos;
     private final FrontendProvider frontend;
     private final LookupService localLookup;
     private final BiConsumer<String, Exception> errorHandler;
 
     public LookupEndpoint(
-            IRepositoryManager repos,
             FrontendProvider frontendProvider,
             LookupService localLookup,
             BiConsumer<String, Exception> errorHandler) {
-        this.repos = repos;
         this.frontend = frontendProvider;
         this.localLookup = localLookup;
         this.errorHandler = errorHandler;
@@ -59,10 +56,6 @@ public final class LookupEndpoint implements IAuthedHandler {
         tags = { "Repository" },
         pathParams = {
             @OpenApiParam(name = "*", description = "Artifact path qualifier", required = true, allowEmptyValue = true),
-            @OpenApiParam(
-                name = "*/latest",
-                description = "[Optional] Artifact path qualifier with /latest at the end returns latest version of artifact as text/plain"
-            )
         },
         responses = {
             @OpenApiResponse(status = "200", description = "Input stream of requested file", content = {
@@ -78,7 +71,7 @@ public final class LookupEndpoint implements IAuthedHandler {
     public void handle(Context ctx, ReposiliteContext context) {
         Reposilite.getLogger().debug("LOOKUP " + context.uri() + " from " + context.address());
 
-        if (context.normalized() == null) {
+        if (context.filepath() == null) {
             ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_BAD_REQUEST, "Invalid GAV path"));
             return;
         }
@@ -120,9 +113,13 @@ public final class LookupEndpoint implements IAuthedHandler {
     }
 
     private void handleError(Context ctx, ErrorDto error) {
-        ctx.result(frontend.forMessage(error.getStatus(), error.getMessage()))
-            .status(error.getStatus())
-            .contentType("text/html")
-            .res.setCharacterEncoding("UTF-8");
+        if (error.getStatus() == HttpStatus.SC_MOVED_TEMPORARILY) {
+            ctx.redirect(error.getMessage());
+        } else {
+            ctx.result(frontend.forMessage(error.getStatus(), error.getMessage()))
+                .status(error.getStatus())
+                .contentType("text/html")
+                .res.setCharacterEncoding("UTF-8");
+        }
     }
 }

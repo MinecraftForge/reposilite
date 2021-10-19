@@ -150,6 +150,9 @@ public final class ConfigurationLoader {
         for (Entry<String, Repository> entry : config.repositories.entrySet()) {
             String name = entry.getKey();
             Repository repo = entry.getValue();
+
+            FilesUtils.validateRepositoryName(name);
+
             for (int index = 0; index < repo.proxies.size(); index++) {
                 String proxy = repo.proxies.get(index);
 
