@@ -32,18 +32,17 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public final class MetadataService implements ReposiliteConfiguration {
     private final MetadataXpp3Reader XML_READER = new MetadataXpp3Reader();
     private final MetadataXpp3Writer XML_WRITER = new MetadataXpp3Writer();
 
-    //TODO: Threading issues? Use Concurrent maps?
-    private final Map<String, CacheEntry> cache = new HashMap<>();
-    private final Map<String, List<CacheEntry>> cacheInputs = new HashMap<>();
+    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<String, List<CacheEntry>> cacheInputs = new ConcurrentHashMap<>();
     private final BiConsumer<String, Exception> errorHandler;
 
     public MetadataService(BiConsumer<String, Exception> errorHandler) {
