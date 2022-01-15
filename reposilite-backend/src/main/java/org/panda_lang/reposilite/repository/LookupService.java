@@ -94,7 +94,7 @@ final class LookupService {
                 visibleRepos.add(repo);
             } else {
                 Result<Session, String> auth = context.session('/' + repo.getName() + '/' + context.filepath());
-                if (!auth.isErr() && auth.get().hasPermission(Permission.READ)) {
+                if (auth.isOk() && auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
                     visibleRepos.add(repo);
                 }
             }
