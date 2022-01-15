@@ -16,6 +16,9 @@
 
 package org.panda_lang.reposilite.repository;
 
+import com.google.common.collect.ImmutableSet;
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
@@ -34,6 +37,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
@@ -41,7 +45,7 @@ public final class MetadataService implements ReposiliteConfiguration {
     private final MetadataXpp3Reader XML_READER = new MetadataXpp3Reader();
     private final MetadataXpp3Writer XML_WRITER = new MetadataXpp3Writer();
 
-    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    private final Map<Pair<String, Set<IRepository>>, CacheEntry> cache = new ConcurrentHashMap<>();
     private final Map<String, List<CacheEntry>> cacheInputs = new ConcurrentHashMap<>();
     private final BiConsumer<String, Exception> errorHandler;
 
@@ -62,11 +66,14 @@ public final class MetadataService implements ReposiliteConfiguration {
      *   3) Maven Plugin Group: /group/maven-metadata.xml
      *     This I dont think we can generate... So request from the proxy, or 404
      */
-    public byte[] mergeMetadata(String key, String filepath, List<IRepository> repos) {
+    public byte[] mergeMetadata(String key, String filepath, List<IRepository> reposList) {
         if (!filepath.endsWith("/maven-metadata.xml"))
             throw new IllegalArgumentException("Invalid maven-metadata.xml filename: " + filepath);
 
-        CacheEntry cached = cache.get(key);
+        // Different people can have access to different repos.
+        // This can affect the versions that are available to them, so we need to reflect this when checking the cache.
+        Set<IRepository> repos = ImmutableSet.copyOf(reposList);
+        CacheEntry cached = cache.get(ImmutablePair.of(key, repos));
         if (cached != null)
             return cached.data;
 
@@ -86,7 +93,7 @@ public final class MetadataService implements ReposiliteConfiguration {
 
         if (existing.size() == 1) {
             try {
-                return addCache(key, Files.readAllBytes(existing.get(0).toPath()), inputs);
+                return addCache(key, Files.readAllBytes(existing.get(0).toPath()), inputs, repos);
             } catch (IOException e) {
                 return null; // TODO: Actually do something about this error?
             }
@@ -116,12 +123,12 @@ public final class MetadataService implements ReposiliteConfiguration {
             return null;
         }
 
-        return addCache(key, bos.toByteArray(), inputs);
+        return addCache(key, bos.toByteArray(), inputs, repos);
     }
 
-    private byte[] addCache(String key, byte[] data, List<String> inputs) {
-        CacheEntry entry = new CacheEntry(key, data, inputs);
-        cache.put(key, entry);
+    private byte[] addCache(String key, byte[] data, List<String> inputs, Set<IRepository> repos) {
+        CacheEntry entry = new CacheEntry(key, data, inputs, repos);
+        cache.put(ImmutablePair.of(key, repos), entry);
         for (String input : inputs)
             cacheInputs.computeIfAbsent(input, k -> new ArrayList<>()).add(entry);
 
@@ -133,7 +140,7 @@ public final class MetadataService implements ReposiliteConfiguration {
         List<CacheEntry> entries = cacheInputs.remove(key);
         if (entries != null) {
             for (CacheEntry ent : entries) {
-                cache.remove(ent.path);
+                cache.remove(ImmutablePair.of(ent.path, ent.repos));
                 ent.inputs.remove(key);
                 for (String input : ent.inputs) {
                     List<CacheEntry> child = cacheInputs.get(input);
@@ -175,10 +182,13 @@ public final class MetadataService implements ReposiliteConfiguration {
         final String path;
         final byte[] data;
         final List<String> inputs;
-        private CacheEntry(String path, byte[] data, List<String> inputs)  {
+        final Set<IRepository> repos;
+
+        private CacheEntry(String path, byte[] data, List<String> inputs, Set<IRepository> repos)  {
             this.path = path;
             this.data = data;
             this.inputs = inputs;
+            this.repos = repos;
         }
     }
 }
