@@ -1,5 +1,5 @@
 plugins {
-    id 'net.minecraftforge.gradleutils' version '1.+'
+    id 'net.minecraftforge.gradleutils'
     id 'com.github.node-gradle.node' version '3.0.1'
 }
 
