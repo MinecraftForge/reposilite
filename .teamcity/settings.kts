@@ -52,6 +52,44 @@ object Build : BuildType({
     id("reposilite__Build")
     name = "Build"
     description = "Builds and Publishes the main branches of the project."
+
+    steps {
+        dockerCommand {
+            name = "Build Image"
+            id = "reposilite__build_image"
+            commandType = build {
+                source = file {
+                    path = "Dockerfile"
+                }
+                contextDir = "."
+                namesAndTags = """
+                containers.minecraftforge.net/reposilite:latest
+                containers.minecraftforge.net/reposilite:%env.BUILD_NUMBER%
+            """.trimIndent()
+                commandArgs = "--pull"
+            }
+            param("dockerImage.platform", "linux")
+        }
+        dockerCommand {
+            name = "Push Image"
+            id = "reposilite__push_image"
+            commandType = push {
+                namesAndTags = """
+                containers.minecraftforge.net/reposilite:latest
+                containers.minecraftforge.net/reposilite:%env.BUILD_NUMBER%
+            """.trimIndent()
+            }
+        }
+    }
+
+    features {
+        dockerSupport {
+            id = "reposilite__DockerSupport"
+            loginToRegistry = on {
+                dockerRegistryId = "PROJECT_EXT_7"
+            }
+        }
+    }
 })
 
 object BuildSecondaryBranches : BuildType({
