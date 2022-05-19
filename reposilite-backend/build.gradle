@@ -50,6 +50,7 @@ test {
 jacocoTestReport.dependsOn(test)
 
 shadowJar {
+    minimize()
     mergeServiceFiles()
     exclude('META-INF/resources/')
     exclude('META-INF/com.android.tools/')
@@ -102,23 +103,45 @@ java {
 
 publishing {
     publications {
-        maven(MavenPublication) {
-            from(components.java) // TODO: Don't include shadowjar somehow? Or severly work on making it skinnier
-            artifactId = project.archivesBaseName
+        mavenJava(MavenPublication) {
+            //TODO: For now we minimize the shadowJar, if that fails we might need a different solution.
+            from components.java
+
+            pom {
+                name = 'Reposilite'
+                description = 'Lightweight repository manager for Maven based artifacts.'
+                url = 'https://github.com/MinecraftForge/Reposilite'
+                scm {
+                    url = 'https://github.com/MinecraftForge/Reposilite'
+                    connection = 'scm:git:git://github.com/MinecraftForge/Reposilite.git'
+                    developerConnection = 'scm:git:git@github.com:MinecraftForge/Reposilite.git'
+                }
+                issueManagement {
+                    system = 'github'
+                    url = 'https://github.com/MinecraftForge/Reposilite/issues'
+                }
+
+                licenses {
+                    license {
+                        name = 'Apache 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+
+                developers {
+                    developer {
+                        id = 'LexManos'
+                        name = 'Lex Manos'
+                    }
+                }
+            }
         }
     }
     repositories {
-        maven {
-            if (System.env.MAVEN_USER) {
-                url 'https://maven.minecraftforge.net/'
-                authentication {
-                    basic(BasicAuthentication)
-                }
-                credentials {
-                    username = System.env.MAVEN_USER ?: 'not'
-                    password = System.env.MAVEN_PASSWORD ?: 'set'
-                }
-            } else {
+        maven gradleutils.getPublishingForgeMaven()
+        if (project.enableLocalRepoDirectory == 'true') {
+            maven {
+                name 'RepoDirectory'
                 url 'file://' + rootProject.file('repo').getAbsolutePath()
             }
         }
