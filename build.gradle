@@ -5,6 +5,9 @@ plugins {
 
 evaluationDependsOnChildren()
 
+def rootProjectVersion = gradleutils.getTagOffsetVersion()
+allprojects {pro -> pro.version = rootProjectVersion}
+
 composeBuild {
     dependsOn(':backend:shadowJar')
     doFirst {
