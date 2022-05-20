@@ -87,17 +87,36 @@ final class LookupService {
         if (filtered.isEmpty())
             return ResponseUtils.error(SC_NOT_FOUND, "Can not find repo at: " + context.uri());
 
+        // Filter out repos the user can't see
+        List<IRepository> visibleRepos = new ArrayList<>();
+        for (IRepository repo : filtered) {
+            if (!repo.isHidden()) {
+                visibleRepos.add(repo);
+            } else {
+                Result<Session, String> auth = context.session('/' + repo.getName() + '/' + context.filepath());
+                if (auth.isOk() && auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
+                    visibleRepos.add(repo);
+                }
+            }
+        }
+
+        if (visibleRepos.isEmpty()) {
+            // The user can't see any of repos that may contain the file, so tell them the file doesn't exist
+            return ResponseUtils.error(SC_NOT_FOUND, "File not found");
+        }
+
         // TODO: File hashes
         if (filtered.size() > 1 && isMeta) {
-            byte[] meta = metadataService.mergeMetadata(context.sanitized(), context.filepath(), filtered);
+            byte[] meta = metadataService.mergeMetadata(context.sanitized(), context.filepath(), visibleRepos);
             if (meta != null)
                 return Result.ok(new LookupResponse("text/xml", meta));
         }
 
-        return findFile(context, parts, isMeta, false, filtered.size() > 1 ? new HashSet<>() : null, filtered, 0, null);
+        return findFile(context, parts, isMeta, false, visibleRepos.size() > 1 ? new HashSet<>() : null, visibleRepos, 0, null);
     }
 
-    private Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context, String[] parts, boolean isMeta, boolean isExplicit, Set<String> visited, List<IRepository> repos, int index, IRepository repo) {
+    private Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context, String[] parts, boolean isMeta, boolean isExplicit, Set<String> visited, List<IRepository> repos, int index,
+            IRepository repo) {
         if (repo == null)
             repo = repos.get(index);
 

@@ -97,11 +97,6 @@ final class DeployService {
 
         Reposilite.getLogger().info("DEPLOY " + authResult.get().getAlias() + " successfully deployed " + file + " from " + context.address());
 
-        //TODO: Remove this when we remove metadata service
-        if (file.getName().contains("maven-metadata")) {
-            return Result.ok(CompletableFuture.completedFuture(Result.ok(fileDetails)));
-        }
-
         //TODO: Design a better API for this, so we don't have to cast to internal types.
         CompletableFuture<Result<FileDetailsDto, ErrorDto>> task = ((RepositoryManager)repos).storeFile(
             uri,
