@@ -39,7 +39,7 @@ public final class ReposiliteConstants {
     private static String loadVersion() {
         LOGGER.debug("Version package {} from {}", ReposiliteConstants.class.getPackage(), ReposiliteConstants.class.getClassLoader());
         String version = ReposiliteConstants.class.getPackage().getImplementationVersion();
-        if (version == null) throw new RuntimeException("Missing forge version, cannot continue");
+        if (version == null) throw new RuntimeException("Missing version, cannot continue");
         LOGGER.debug("Found version {}", version);
         return version;
     }

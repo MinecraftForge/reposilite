@@ -4,6 +4,7 @@ plugins {
 }
 
 evaluationDependsOnChildren()
+version = project(':backend').version
 
 composeBuild {
     dependsOn(':backend:shadowJar')
