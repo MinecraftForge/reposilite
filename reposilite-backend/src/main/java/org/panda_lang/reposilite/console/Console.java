@@ -32,7 +32,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 
-@Command(name = "", version = "Reposilite " + ReposiliteConstants.VERSION)
+@Command(name = "")
 public final class Console {
 
     private final ConsoleThread consoleThread;

@@ -26,7 +26,7 @@ import picocli.CommandLine.Option;
 import java.io.File;
 import java.util.Optional;
 
-@Command(name = "reposilite", version = "Reposilite " + ReposiliteConstants.VERSION)
+@Command(name = "reposilite")
 public final class ReposiliteLauncher {
 
     @Option(names = { "--help", "-H" }, usageHelp = true, description = "display help message")

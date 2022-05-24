@@ -33,13 +33,21 @@ jar {
     // Be sure to run frontend:build when editing anything in the front end so that these sources are updated
     // Not hard linked so that the CI doesn't need NPM installed {TODO: build proper image?}
     manifest {
-        attributes(
+        attributes([
             'Main-Class': 'org.panda_lang.reposilite.ReposiliteLauncher',
             'Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ"),
             'GitCommit': gradleutils.gitInfo.abbreviatedId,
             'Git-Branch': gradleutils.gitInfo.branch,
             'Multi-Release': true // Some shaded deps
-        )
+        ] as LinkedHashMap)
+        attributes([
+            'Specification-Title':      'Reposilite',
+            'Specification-Vendor':     'Forge Development LLC',
+            'Specification-Version':    '2',
+            'Implementation-Title':     'Forge Reposilite',
+            'Implementation-Version':   project.version,
+            'Implementation-Vendor':    'Forge'
+        ] as LinkedHashMap, 'org/panda_lang/reposilite/')
     }
 }
 test {
@@ -50,7 +58,7 @@ test {
 jacocoTestReport.dependsOn(test)
 
 shadowJar {
-    minimize()
+    //minimize() //logging uses things via reflection that minimize strips. TODO: Review and start manually stripping deps.
     mergeServiceFiles()
     exclude('META-INF/resources/')
     exclude('META-INF/com.android.tools/')
@@ -106,6 +114,7 @@ publishing {
         mavenJava(MavenPublication) {
             //TODO: For now we minimize the shadowJar, if that fails we might need a different solution.
             from components.java
+            artifactId = project.archivesBaseName
 
             pom {
                 name = 'Reposilite'
@@ -139,12 +148,6 @@ publishing {
     }
     repositories {
         maven gradleutils.getPublishingForgeMaven()
-        if (project.enableLocalRepoDirectory == 'true') {
-            maven {
-                name 'RepoDirectory'
-                url 'file://' + rootProject.file('repo').getAbsolutePath()
-            }
-        }
     }
 }
 
