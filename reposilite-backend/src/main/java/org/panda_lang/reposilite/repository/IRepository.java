@@ -17,7 +17,6 @@ public interface IRepository {
     boolean canContain(String path);
     boolean isDirectory(String path);
 
-
     /* Loads information from disc, or wherever the repos are stored.
      * Calculates quotas and stuff like that
      */
@@ -25,8 +24,8 @@ public interface IRepository {
     IQuota getQuota();
 
     //TODO: Make this not use files, but something that allows us to swap out storage backends
-    File getFile(String... elements);
-    boolean contains(String path);
+    File getFile(View view, String... elements);
+    boolean contains(View view, String path);
 
     public interface Builder {
         Builder prefix(String... values);
@@ -41,5 +40,14 @@ public interface IRepository {
         Builder dir(File value);
         Builder baseDir(File value);
         IRepository build();
+    }
+
+    public enum View {
+        // A view of releases only, may be multiple repos
+        RELEASES,
+        // A view of snapshots only, may be multiple repos
+        SNAPSHOTS,
+        // A view of everything, most likely multiple repos
+        ALL
     }
 }

@@ -24,12 +24,11 @@ import java.util.Base64
 import java.util.concurrent.Executors
 import org.eclipse.jetty.server.HttpInput
 import org.eclipse.jetty.server.HttpOutput
-import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.auth.IAuthManager
 import org.panda_lang.reposilite.repository.IRepositoryManager
-
+import org.panda_lang.reposilite.repository.IRepository.View
 import javax.servlet.http.HttpServletRequest
 import javax.servlet.http.HttpServletResponse
 
@@ -37,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.*
 import static org.mockito.ArgumentMatchers.anyString
 import static org.mockito.Mockito.*
 
+@TestMethodOrder(MethodOrderer.MethodName.class)
 @CompileStatic
 class ReposiliteContextTest {
 
@@ -61,8 +61,7 @@ class ReposiliteContextTest {
             .repo('filtered', {
                 it.prefix('/special/')
             })
-            .repo("main-releases", {})
-            .repo("main-snapshots", {})
+            .repo("main", {})
             .build()
 
         AUTH_MANAGER = IAuthManager.builder()
@@ -110,31 +109,72 @@ class ReposiliteContextTest {
     }
 
     @Test
-    void 'should have main-release and filtered repositories for releases' () {
-        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('filtered'), REPOSITORY_MANAGER.getRepo('main-releases'))
+    void 'should have main and filtered repositories for releases' () {
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('filtered'), REPOSITORY_MANAGER.getRepo('main'))
         def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/releases/'))
         assertEquals '', context.filepath()
         assertIterableEquals expected, context.repos()
+        assertEquals View.RELEASES, context.view()
         context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/releases'))
         assertEquals '', context.filepath()
+        assertEquals View.RELEASES, context.view()
         assertIterableEquals expected, context.repos()
     }
 
     @Test
+    void 'should have main repo for main-releases' () {
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('main'))
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/main-releases/'))
+        assertEquals '', context.filepath()
+        assertIterableEquals expected, context.repos()
+        assertEquals View.RELEASES, context.view()
+    }
+
+    @Test
     void 'should have main-snapshots and filtered repositories for snapshots' () {
-        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('filtered'), REPOSITORY_MANAGER.getRepo('main-snapshots'))
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('filtered'), REPOSITORY_MANAGER.getRepo('main'))
         def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/snapshots/'))
         assertEquals '', context.filepath()
+        assertEquals View.SNAPSHOTS, context.view()
         assertIterableEquals expected, context.repos()
         context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/snapshots'))
         assertEquals '', context.filepath()
+        assertEquals View.SNAPSHOTS, context.view()
         assertIterableEquals expected, context.repos()
+    }
+
+    @Test
+    void 'should have main repo for main-snapshots' () {
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('main'))
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/main-snapshots/'))
+        assertEquals '', context.filepath()
+        assertIterableEquals expected, context.repos()
+        assertEquals View.SNAPSHOTS, context.view()
+    }
+
+    @Test
+    void 'should have main repo and all view for main' () {
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('main'))
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/main/'))
+        assertEquals '', context.filepath()
+        assertIterableEquals expected, context.repos()
+        assertEquals View.ALL, context.view()
+    }
+
+    @Test
+    void 'should have main repo and all view for main with path' () {
+        def expected = Arrays.asList(REPOSITORY_MANAGER.getRepo('main'))
+        def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/main/some/path'))
+        assertEquals 'some/path', context.filepath()
+        assertIterableEquals expected, context.repos()
+        assertEquals View.ALL, context.view()
     }
 
     @Test
     void 'should have all repositories at root' () {
         def context = ReposiliteContext.create(AUTH_MANAGER, REPOSITORY_MANAGER, IP_HEADER, createContext('/'))
         assertEquals '', context.filepath()
+        assertEquals View.ALL, context.view()
         assertIterableEquals REPOSITORY_MANAGER.getRepos(), context.repos()
     }
 

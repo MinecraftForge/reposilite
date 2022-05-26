@@ -23,6 +23,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import org.panda_lang.reposilite.ReposiliteConfiguration;
+import org.panda_lang.reposilite.repository.IRepository.View;
 import org.panda_lang.utilities.commons.function.Result;
 import org.panda_lang.utilities.commons.function.ThrowingRunnable;
 import org.panda_lang.utilities.commons.function.ThrowingSupplier;
@@ -105,6 +106,7 @@ class RepositoryManager implements IRepositoryManager {
     <R, E, T extends Exception> CompletableFuture<Result<R, E>> storeFile(
             String id,
             IRepository repo,
+            View view,
             String path,
             ThrowingSupplier<InputStream, IOException> source,
             ThrowingSupplier<R, T> onSuccess,
@@ -113,7 +115,7 @@ class RepositoryManager implements IRepositoryManager {
         CompletableFuture<Result<R, E>> task = new CompletableFuture<>();
 
         tryExecute(id, task, onError, () -> {
-            this.storage.storeFile(source.get(), repo, path).thenAccept(file -> {
+            this.storage.storeFile(source.get(), repo, path, view).thenAccept(file -> {
                 tryExecute(id, task, onError, () -> {
                     task.complete(Result.ok(onSuccess.get()));
                 });

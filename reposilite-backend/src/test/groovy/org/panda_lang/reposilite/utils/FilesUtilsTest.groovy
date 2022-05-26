@@ -79,11 +79,15 @@ final class FilesUtilsTest {
         assertThrows IllegalArgumentException.class, {
             FilesUtils.validateRepositoryName("snapshots")
         }
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("valid-releases")
+        }
+        assertThrows IllegalArgumentException.class, {
+            FilesUtils.validateRepositoryName("valid-snapshots")
+        }
 
         assertDoesNotThrow({
             FilesUtils.validateRepositoryName("valid")
-            FilesUtils.validateRepositoryName("valid-releases")
-            FilesUtils.validateRepositoryName("valid-snapshots")
         } as Executable)
     }
 }

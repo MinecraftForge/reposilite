@@ -21,6 +21,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.repository.IRepository.Builder
+import org.panda_lang.reposilite.repository.IRepository.View
 
 import static org.junit.jupiter.api.Assertions.*
 
@@ -39,19 +40,19 @@ class RepositoryTest {
             .dir(WORKINGG_DIRECTORY)
             .build();
 
-        REPOSITORY.getFile('group/artifact/version/').mkdirs()
-        REPOSITORY.getFile('group/artifact/version/test').createNewFile()
+        REPOSITORY.getFile(View.RELEASES, 'group/artifact/version/').mkdirs()
+        REPOSITORY.getFile(View.RELEASES, 'group/artifact/version/test').createNewFile()
     }
 
     @Test
     void 'should find requested entity' () {
-        assertFalse REPOSITORY.contains('unknown')
-        assertTrue REPOSITORY.contains('group/artifact/version/test')
+        assertFalse REPOSITORY.contains(View.RELEASES, 'unknown')
+        assertTrue REPOSITORY.contains(View.RELEASES, 'group/artifact/version/test')
     }
 
     @Test
     void 'should return file' () {
-        assertEquals 'test', REPOSITORY.getFile('test').getName()
+        assertEquals 'test', REPOSITORY.getFile(View.RELEASES, 'test').getName()
     }
 
     @Test

@@ -27,19 +27,23 @@ import org.apache.http.entity.StringEntity
 import org.apache.http.impl.auth.BasicScheme
 import org.apache.http.impl.client.HttpClients
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.panda_lang.reposilite.ReposiliteContext
 import org.panda_lang.reposilite.ReposiliteIntegrationTestSpecification
+import org.panda_lang.reposilite.repository.IRepository.View
 import org.panda_lang.utilities.commons.IOUtils
 import org.panda_lang.utilities.commons.StringUtils
 
 import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'repositories': 'isspecial,main-releases,main-snapshots,private,zero',
+            'repositories': 'isspecial,main,private,zero',
 
             'repositories.isspecial.prefixes': 'special/',
 
@@ -58,13 +62,13 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
         PASSWORD = super.reposilite.getAuth().createRandomPassword() // Random password to be sure we don't hardcode anything in the codebase.
         super.reposilite.getAuth().createToken('/', 'root', 'rwm', PASSWORD)
         super.reposilite.getAuth().createToken('/', 'read', 'r', PASSWORD)
-        super.reposilite.getAuth().createToken('/main-releases/auth/test', 'authtest', 'rwm', PASSWORD)
+        super.reposilite.getAuth().createToken('/main/auth/test', 'authtest', 'rwm', PASSWORD)
         super.reposilite.getAuth().createToken('/private', 'private', 'rwm', PASSWORD)
     }
 
     @Test
     void 'should return 507 and out of disk space message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/zero/groupId/artifactId/file', 'root', PASSWORD, 'content', HttpStatus.SC_INSUFFICIENT_STORAGE, 'Out of disk space'
+        shouldReturnErrorWithGivenMessage '/zero-releases/groupId/artifactId/file', 'root', PASSWORD, 'content', HttpStatus.SC_INSUFFICIENT_STORAGE, 'Out of disk space'
     }
 
     @Test
@@ -74,7 +78,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should return 405 and artifact deployment is disabled message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/private/groupId/artifactId/file', 'private', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Artifact deployment is disabled'
+        shouldReturnErrorWithGivenMessage '/private-releases/groupId/artifactId/file', 'private', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Artifact deployment is disabled'
     }
 
     @Test
@@ -93,18 +97,24 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
     }
 
     @Test
+    void 'should return 405 and error message for non-snapshot artifact'() throws IOException, AuthenticationException {
+        shouldReturnErrorWithGivenMessage '/main-snapshots/auth/test/pom.xml', 'authtest', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Cannot deploy non-SNAPSHOT artifact to snapshot repo'
+    }
+
+
+    @Test
     void 'should return 405 and can not contain message' () throws Exception {
-        shouldReturnErrorWithGivenMessage '/isspecial/not/special', 'root', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Repository isspecial can not contain: not/special'
+        shouldReturnErrorWithGivenMessage '/isspecial-releases/not/special', 'root', PASSWORD, 'content', HttpStatus.SC_METHOD_NOT_ALLOWED, 'Repository isspecial can not contain: not/special'
     }
 
     @Test
     void 'should return 200 and success message for special'() throws IOException, AuthenticationException {
-        shouldReturn200AndSuccessMessage '/isspecial/special/file', 'root', PASSWORD, 'content'
+        shouldReturn200AndSuccessMessage '/isspecial-releases/special/file', 'root', PASSWORD, 'content'
     }
 
     @Test
     void 'should successfully publish to main-releases from releases'() throws Exception {
-        def file = super.reposilite.getRepos().getRepo('main-releases').getFile('test/upload/artifact')
+        def file = super.reposilite.getRepos().getRepo('main').getFile(View.RELEASES, 'test/upload/artifact')
         assertFalse file.exists()
         shouldReturn200AndSuccessMessage '/releases/test/upload/artifact', 'root', PASSWORD, 'content'
         assertTrue file.exists()
@@ -112,7 +122,7 @@ class DeployEndpointTest extends ReposiliteIntegrationTestSpecification {
 
     @Test
     void 'should successfully publish to ispecial from releases'() throws Exception {
-        def file = super.reposilite.getRepos().getRepo('isspecial').getFile('special/upload/artifact')
+        def file = super.reposilite.getRepos().getRepo('isspecial').getFile(View.RELEASES, 'special/upload/artifact')
         assertFalse file.exists()
         shouldReturn200AndSuccessMessage '/releases/special/upload/artifact', 'root', PASSWORD, 'content'
         assertTrue file.exists()

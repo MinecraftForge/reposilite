@@ -19,6 +19,7 @@ package org.panda_lang.reposilite;
 import org.panda_lang.reposilite.auth.IAuthManager;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.repository.IRepository;
+import org.panda_lang.reposilite.repository.IRepository.View;
 import org.panda_lang.reposilite.repository.IRepositoryManager;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
@@ -48,7 +49,7 @@ public final class ReposiliteContext {
         else if (uri.equals("/api"))
             uri = "";
 
-        View view = View.NONE;
+        View view = View.ALL;
         String filepath = null;
         String sanitized = sanitize(uri);
         List<IRepository> repos = new ArrayList<>();
@@ -57,34 +58,39 @@ public final class ReposiliteContext {
             int idx = sanitized.indexOf('/');
             if (idx == -1) {
                 filepath = sanitized;
-                view = View.ALL;
                 repos.addAll(repoManager.getRepos());
             } else {
                 String name = sanitized.substring(0, idx);
                 if ("releases".equals(name)) {
                     view = View.RELEASES;
-                    repoManager.getRepos().stream()
-                    .filter(r -> r.getName().indexOf('-') == -1 || r.getName().endsWith("-releases"))
-                    .forEach(repos::add);
+                    repos.addAll(repoManager.getRepos());
+                    filepath = sanitized.substring(idx + 1);
                 } else if ("snapshots".equals(name)) {
                     view = View.SNAPSHOTS;
-                    repoManager.getRepos().stream()
-                    .filter(r -> r.getName().indexOf('-') == -1 || r.getName().endsWith("-snapshots"))
-                    .forEach(repos::add);
+                    repos.addAll(repoManager.getRepos());
+                    filepath = sanitized.substring(idx + 1);
                 } else {
+                    int hidx = name.indexOf('-');
+                    if (hidx > 1) {
+                        String view_name = name.substring(hidx + 1);
+                        if ("releases".equals(view_name)) {
+                            view = View.RELEASES;
+                            name = name.substring(0, hidx);
+                        } else if ("snapshots".equals(view_name)) {
+                            view = View.SNAPSHOTS;
+                            name = name.substring(0, hidx);
+                        }
+                    }
+
                     IRepository repo = repoManager.getRepo(name);
                     if (repo == null) {
-                        view = View.ALL;
                         repos.addAll(repoManager.getRepos());
+                        filepath = sanitized;
                     } else {
-                        view = View.EXPLICIT;
                         repos.add(repo);
+                        filepath = sanitized.substring(idx + 1);
                     }
                 }
-                if (view != View.ALL)
-                    filepath = sanitized.substring(idx + 1);
-                else
-                    filepath = sanitized;
             }
         }
 
@@ -252,18 +258,5 @@ public final class ReposiliteContext {
 
     public View view() {
         return view;
-    }
-
-    public enum View {
-        // Specified an explicit repo, this one only.
-        EXPLICIT,
-        // A view of releases only, may be multiple repos
-        RELEASES,
-        // A view of snapshots only, may be multiple repos
-        SNAPSHOTS,
-        // A view of everything, most likely multiple repos
-        ALL,
-        // You asked for something weird so you get nothing!
-        NONE
     }
 }

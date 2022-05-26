@@ -23,6 +23,7 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteConfiguration;
 import org.panda_lang.reposilite.console.ReposiliteCommand;
+import org.panda_lang.reposilite.repository.IRepository.View;
 
 import picocli.CommandLine.Command;
 
@@ -63,7 +64,7 @@ public final class MetadataService implements ReposiliteConfiguration {
      *   3) Maven Plugin Group: /group/maven-metadata.xml
      *     This I dont think we can generate... So request from the proxy, or 404
      */
-    public byte[] mergeMetadata(String key, String filepath, List<IRepository> repos) {
+    public byte[] mergeMetadata(String key, String filepath, View view, List<IRepository> repos) {
         if (!filepath.endsWith("/maven-metadata.xml"))
             throw new IllegalArgumentException("Invalid maven-metadata.xml filename: " + filepath);
 
@@ -75,11 +76,24 @@ public final class MetadataService implements ReposiliteConfiguration {
         // a metadata file already exists. This way we don't create metadata files for directory listings.
         List<String> inputs = new ArrayList<>();
         List<File> existing = new ArrayList<>();
+        List<View> views = new ArrayList<>();
+
+        if (view == View.SNAPSHOTS)
+            views.add(View.SNAPSHOTS);
+        else if (view == View.RELEASES)
+            views.add(View.RELEASES);
+        else {
+            views.add(View.SNAPSHOTS);
+            views.add(View.RELEASES);
+        }
+
         for (IRepository repo : repos) {
-            File meta = repo.getFile(filepath);
-            inputs.add(meta.getAbsolutePath());
-            if (meta.exists())
-                existing.add(meta);
+            for (View v : views) {
+                File meta = repo.getFile(v, filepath);
+                inputs.add(meta.getAbsolutePath());
+                if (meta.exists())
+                    existing.add(meta);
+            }
         }
 
         if (existing.isEmpty())

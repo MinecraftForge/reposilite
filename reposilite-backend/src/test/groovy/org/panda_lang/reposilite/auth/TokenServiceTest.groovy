@@ -41,8 +41,7 @@ class TokenServiceTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo("main-releases", {})
-            .repo("main-snapshots", {})
+            .repo("main", {})
             .build()
     }
 

@@ -35,13 +35,13 @@ import static org.junit.jupiter.api.Assertions.*
 class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'repositories':                'main-releases,main-snapshots,private',
+            'repositories':                'main,private',
             'repositories.private.hidden': 'true'
         ])
     }
 
     @Test
-    void 'root should return list of repositories' () {
+    void 'root should return list of public repositories' () {
         def resp = shouldReturn200AndFileList('/api')
         assertNotNull resp
         assertEquals 2, resp.files.size()
@@ -52,8 +52,8 @@ class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
     void 'root should return list of all authenticated repositories' () {
         def token = super.reposilite.getAuth().createToken('/private', 'secret', 'rwm', 'password')
         def resp = shouldReturn200AndFileList('/api', token.alias, 'password')
-        assertEquals 3, resp.files.size()
-        assertEquals(['main-releases', 'main-snapshots', 'private'], getNames(resp))
+        assertEquals 4, resp.files.size()
+        assertEquals(['main-releases', 'main-snapshots', 'private-releases', 'private-snapshots'], getNames(resp))
     }
 
     @Test
@@ -93,7 +93,7 @@ class LookupApiEndpointTest extends ReposiliteIntegrationTestSpecification {
     @Test
     void 'releases should return not implemented for non-explicit request' () {
         def resp = shouldReturn501AndError('/api/releases/reposilite/test')
-        assertEquals 'Can not browse API in merged views. Must specify a repository', resp.message
+        assertEquals 'Can not browse API in merged views. Must specify a repository and view', resp.message
     }
 
     @Test

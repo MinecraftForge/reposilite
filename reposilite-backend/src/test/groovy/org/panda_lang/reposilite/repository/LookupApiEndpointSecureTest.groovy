@@ -38,11 +38,10 @@ import static org.apache.http.HttpStatus.*
 class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'repositories':                           'main-releases,main-snapshots,private',
-            'repositories.main-releases.browseable':  'false',
-            'repositories.main-snapshots.browseable': 'false',
-            'repositories.private.hidden':            'true',
-            'repositories.private.browseable':        'false'
+            'repositories':                    'main,private',
+            'repositories.main.browseable':    'false',
+            'repositories.private.hidden':     'true',
+            'repositories.private.browseable': 'false'
         ])
     }
 
@@ -55,8 +54,8 @@ class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification
     void 'root should return list of all authenticated repositories' () {
         def password = makeToken('/', 'username', Permission.READ)
         def resp = shouldReturn200AndFileList('/api', 'username', password)
-        assertEquals 3, resp.files.size()
-        assertEquals(['main-releases', 'main-snapshots', 'private'], getNames(resp))
+        assertEquals 4, resp.files.size()
+        assertEquals(['main-releases', 'main-snapshots', 'private-releases', 'private-snapshots'], getNames(resp))
     }
 
     @Test
@@ -82,7 +81,7 @@ class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification
 
     @Test
     void 'explicit should return 404 if requested file is not found' () {
-        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def password = makeToken('/main/', 'username', Permission.READ)
         def resp = shouldReturn404AndError('/api/main-releases/reposilite/test/unknown', 'username', password)
         assertEquals 'File not found', resp.message
     }
@@ -99,7 +98,7 @@ class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification
 
     @Test
     void 'explicit should return 200 and file details' () {
-        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def password = makeToken('/main/', 'username', Permission.READ)
         def result = shouldReturn200AndFileDetails('/api/main-releases/reposilite/test/1.0.0/test-1.0.0.jar', 'username', password)
         assertEquals FileDetailsDto.FILE, result.type
         assertEquals 'test-1.0.0.jar', result.name
@@ -107,7 +106,7 @@ class LookupApiEndpointSecureTest extends ReposiliteIntegrationTestSpecification
 
     @Test
     void 'ecplicit should return 200 and directory list' () {
-        def password = makeToken('/main-releases/', 'username', Permission.READ)
+        def password = makeToken('/main/', 'username', Permission.READ)
         def result = shouldReturn200AndFileList('/api/main-releases/reposilite/test', 'username', password)
         assertEquals 4, result.files.size()
         assertEquals(['1.0.0', '1.0.1', 'maven-metadata.xml', 'maven-metadata.xml.md5'], getNames(result))

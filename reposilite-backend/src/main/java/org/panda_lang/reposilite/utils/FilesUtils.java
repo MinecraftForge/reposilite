@@ -179,7 +179,7 @@ public final class FilesUtils {
             throw new IllegalArgumentException("Invalid repository name: " + name + " (reserved name)");
 
         int idx  = name.indexOf('-');
-        if (idx != -1 && !"-releases".equals(name.substring(idx)) && !"-snapshots".equals(name.substring(idx)))
+        if (idx != -1)
             throw new IllegalArgumentException("Invalid repository name: " + name + " (illegal suffix)");
     }
 }

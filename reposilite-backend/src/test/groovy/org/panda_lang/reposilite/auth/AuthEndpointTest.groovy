@@ -54,7 +54,7 @@ final class AuthEndpointTest extends ReposiliteIntegrationTestSpecification {
         def response = shouldReturn200AndAuth('/api/auth', 'admin', password)
         assertEquals 'rwm', response.permissions
         assertEquals '/', response.path
-        assertEquals(['main-releases', 'main-snapshots'], response.repositories)
+        assertEquals(['main'], response.repositories)
     }
 
     private static ErrorDto shouldReturn404AndError(String uri, String username, String password) {

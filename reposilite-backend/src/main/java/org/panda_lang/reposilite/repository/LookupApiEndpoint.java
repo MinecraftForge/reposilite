@@ -23,19 +23,20 @@ import io.javalin.plugin.openapi.annotations.OpenApiParam;
 import io.javalin.plugin.openapi.annotations.OpenApiResponse;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteContext.View;
 import org.panda_lang.reposilite.auth.IAuthedHandler;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
 import org.panda_lang.reposilite.metadata.MetadataUtils;
+import org.panda_lang.reposilite.repository.IRepository.View;
 import org.panda_lang.reposilite.utils.FilesUtils;
 import org.panda_lang.utilities.commons.StringUtils;
 import org.panda_lang.utilities.commons.function.Option;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -100,21 +101,22 @@ final class LookupApiEndpoint implements IAuthedHandler {
             }
 
             // Even if its empty (the logged in user has no view rights) send the result
-            ctx.json(new FileListDto(viewable.stream()
-                .map(IRepository::getFile)
-                .map(FileDetailsDto::of)
-                .collect(Collectors.toList()))
-            );
+            List<FileDetailsDto> files = new ArrayList<>();
+            for (IRepository repo : viewable) {
+                files.add(FileDetailsDto.of(repo.getFile(View.RELEASES), repo.getName() + "-releases"));
+                files.add(FileDetailsDto.of(repo.getFile(View.SNAPSHOTS), repo.getName() + "-snapshots"));
+            }
+            ctx.json(new FileListDto(files));
             return;
         }
 
-        if (context.view() != View.EXPLICIT && context.view() != View.ALL) {
-            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_IMPLEMENTED, "Can not browse API in merged views. Must specify a repository"));
+        if (context.view() != View.ALL && context.repos().size() > 1) {
+            ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_IMPLEMENTED, "Can not browse API in merged views. Must specify a repository and view"));
             return;
         }
 
-        IRepository repo = context.view() == View.ALL || context.repos().isEmpty() ? null : context.repos().get(0);
-        if (repo == null) {
+        IRepository repo = context.repos().isEmpty() ? null : context.repos().get(0);
+        if (repo == null || context.view() == View.ALL) {
             ResponseUtils.errorResponse(ctx, new ErrorDto(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.sanitized()));
             return;
         }
@@ -127,7 +129,7 @@ final class LookupApiEndpoint implements IAuthedHandler {
             }
         }
 
-        File requestedFile = repo.getFile(context.filepath());
+        File requestedFile = repo.getFile(context.view(), context.filepath());
         Optional<FileDetailsDto> latest = findLatest(requestedFile);
 
         if (latest.isPresent()) {

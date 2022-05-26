@@ -13,6 +13,7 @@ import org.panda_lang.reposilite.ReposiliteLauncher
 import org.panda_lang.reposilite.config.Configuration
 import org.panda_lang.reposilite.config.ConfigurationLoader
 import org.panda_lang.reposilite.error.FailureService
+import org.panda_lang.reposilite.repository.IRepository.View
 import org.panda_lang.utilities.commons.FileUtils
 
 import java.util.concurrent.ExecutorService
@@ -26,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.*
 final class LookupDelegateTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'repositories':                        'main-releases,delegate',
-            'repositories.main-releases.delegate': 'delegate'
+            'repositories':               'main,delegate',
+            'repositories.main.delegate': 'delegate'
         ])
     }
     private static final String FILE_PATH = '/delegated/artifact/version/file'
@@ -35,7 +36,7 @@ final class LookupDelegateTest extends ReposiliteIntegrationTestSpecification {
 
     @BeforeEach
     void configure() throws IOException {
-        def file = super.reposilite.repos.getRepo('delegate').getFile(FILE_PATH)
+        def file = super.reposilite.repos.getRepo('delegate').getFile(View.RELEASES, FILE_PATH)
         file.getParentFile().mkdirs()
         file.createNewFile()
         FileUtils.overrideFile(file, FILE_CONTENT)

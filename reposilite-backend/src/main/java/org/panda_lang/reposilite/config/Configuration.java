@@ -92,9 +92,6 @@ public final class Configuration {
     "# Repository names must mete the following criteria:",
     "#   No '-': This denotes a suffix for filtering.",
     "#   Lowercase: To prevent ambiguity in requests.",
-    "#   Neither `releases` or `snapshots`: Reserved for multi-repo views.",
-    "# Names may have a `-releases` or `-snapshots` suffix, if they do they will be",
-    "# considered for the special multi-repo views.",
     "#",
     "# repositories {",
     "#   main {",
@@ -123,8 +120,7 @@ public final class Configuration {
     "# }"
     })
     public LinkedHashMap<String, Repository> repositories = new LinkedHashMap<String, Repository>() {{
-        put("main-releases", new Repository());
-        put("main-snapshots", new Repository());
+        put("main", new Repository());
     }};
 
     public static class Repository {

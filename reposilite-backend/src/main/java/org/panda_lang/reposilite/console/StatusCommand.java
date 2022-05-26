@@ -36,20 +36,22 @@ final class StatusCommand implements ReposiliteCommand {
 
     @Override
     public boolean execute(List<String> response) {
-        String latestVersion = reposilite.isTestEnvEnabled() ? ReposiliteConstants.VERSION : getVersion();
+        //String latestVersion = reposilite.isTestEnvEnabled() ? ReposiliteConstants.VERSION : getVersion();
 
         response.add("Reposilite " + ReposiliteConstants.VERSION + " Status");
-        response.add("  Active: " + Effect.GREEN_BOLD + reposilite.getHttpServer().isAlive() + Effect.RESET);
-        response.add("  Uptime: " + TimeUtils.format(reposilite.getUptime() / 1000.0 / 60.0) + "min");
-        response.add("  Memory usage of process: " + getMemoryUsage());
-        response.add("  Disk usage: " + reposilite.getRepos().getQuota());
+        response.add("  Active:  " + Effect.GREEN_BOLD + reposilite.getHttpServer().isAlive() + Effect.RESET);
+        response.add("  Uptime:  " + TimeUtils.format(reposilite.getUptime() / 1000.0 / 60.0) + "min");
+        response.add("  Memory:  " + getMemoryUsage());
+        response.add("  Disk:    " + reposilite.getRepos().getQuota());
         // Don't care, response.add("  Cached metadata: " + reposilite.getMetadataService().getCacheSize());
-        response.add("  Exceptions: " + reposilite.getFailureService().getFailures().size());
-        response.add("  Latest version of reposilite: " + latestVersion);
+        response.add("  Errrors: " + reposilite.getFailureService().getFailures().size());
+        // TODO: Move to our versioon checking system
+        //response.add("  Latest version of reposilite: " + latestVersion);
 
         return true;
     }
 
+    @SuppressWarnings("unused")
     private String getVersion() {
         String latest = IOUtils
                 .fetchContent(ReposiliteConstants.REMOTE_VERSION)

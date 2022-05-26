@@ -11,6 +11,7 @@ import org.panda_lang.reposilite.ReposiliteLauncher
 import org.panda_lang.reposilite.config.Configuration
 import org.panda_lang.reposilite.config.ConfigurationLoader
 import org.panda_lang.reposilite.error.FailureService
+import org.panda_lang.reposilite.repository.IRepository.View
 import org.panda_lang.utilities.commons.FileUtils
 
 import java.util.concurrent.ExecutorService
@@ -24,7 +25,7 @@ final class LookupProxyTest extends ReposiliteIntegrationTestSpecification {
         super.properties.putAll([
             'proxyConnectTimeout': '1000',
             'proxyReadTimeout':    '1000',
-            'repositories':        'main-releases,main-snapshots,proxy',
+            'repositories':        'main,proxy',
             'repositories.proxy.allowUploads': 'false',
             'repositories.proxy.proxies':      'http://localhost:' + PORT + '/main-releases',
         ])
@@ -34,7 +35,7 @@ final class LookupProxyTest extends ReposiliteIntegrationTestSpecification {
 
     @BeforeEach
     void configure() throws IOException {
-        def file = super.reposilite.repos.getRepo('main-releases').getFile(FILE_PATH)
+        def file = super.reposilite.repos.getRepo('main').getFile(View.RELEASES, FILE_PATH)
         file.getParentFile().mkdirs()
         file.createNewFile()
         FileUtils.overrideFile(file, FILE_CONTENT)

@@ -18,6 +18,8 @@ package org.panda_lang.reposilite.repository;
 
 import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.Reposilite;
+import org.panda_lang.reposilite.repository.IRepository.View;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -52,12 +54,12 @@ final class RepositoryStorage {
         Reposilite.getLogger().info(manager.getRepos().size() + " repositories have been found " + manager.getQuota());
     }
 
-    CompletableFuture<File> storeFile(InputStream source, IRepository repo, String path) throws Exception {
-        return storeFile(new CompletableFuture<>(), source, repo, path);
+    CompletableFuture<File> storeFile(InputStream source, IRepository repo, String path, View view) throws Exception {
+        return storeFile(new CompletableFuture<>(), source, repo, path, view);
     }
 
-    private CompletableFuture<File> storeFile(CompletableFuture<File> task, InputStream source, IRepository repo, String path) throws IOException {
-        File targetFile = repo.getFile(path);
+    private CompletableFuture<File> storeFile(CompletableFuture<File> task, InputStream source, IRepository repo, String path, View view) throws IOException {
+        File targetFile = repo.getFile(view, path);
 
         if (targetFile.isDirectory()) {
             throw new IOException("Cannot lock directory");
@@ -68,7 +70,7 @@ final class RepositoryStorage {
         if (lockedFile.exists()) {
             scheduled.schedule(() -> {
                 executor.submit(() -> {
-                    storeFile(task, source, repo, path);
+                    storeFile(task, source, repo, path, view);
                     return null;
                 });
             }, RETRY_WRITE_TIME, TimeUnit.MILLISECONDS);

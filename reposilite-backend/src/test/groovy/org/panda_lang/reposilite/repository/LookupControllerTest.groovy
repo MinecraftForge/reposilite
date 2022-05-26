@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*
 class LookupControllerTest extends ReposiliteIntegrationTestSpecification {
     {
         super.properties.putAll([
-            'repositories':                   'filtered,main-releases,main-snapshots,private',
+            'repositories':                   'filtered,main,private',
             'repositories.filtered.prefixes': 'special/',
             'repositories.private.hidden':    'true',
         ])
@@ -211,9 +211,8 @@ class LookupControllerTest extends ReposiliteIntegrationTestSpecification {
     }
 
     @Test
-    void 'snapshots should return 200 and known file from filtered repo' () {
-        def response = shouldReturn200AndData '/snapshots/special/test/1.0.0/test-1.0.0-known.txt'
-        assertEquals 'known artifact contents', response
+    void 'snapshots should return 404 for known file from filtered repo in wrong view' () {
+        assertResponseWithMessage SC_NOT_FOUND, '/snapshots/special/test/1.0.0/test-1.0.0-known.txt', 'File not found'
     }
     //============================================================================================================
     // 'all' view

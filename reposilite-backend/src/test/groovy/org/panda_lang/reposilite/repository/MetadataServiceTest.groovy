@@ -4,6 +4,7 @@ import groovy.transform.CompileStatic
 import org.junit.jupiter.api.Test
 import org.panda_lang.reposilite.ReposiliteTestSpecification
 import org.panda_lang.reposilite.repository.RepositoryManager
+import org.panda_lang.reposilite.repository.IRepository.View
 import org.panda_lang.utilities.commons.function.Result
 
 import static org.junit.jupiter.api.Assertions.*
@@ -53,7 +54,7 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
         def metadataService = metadata()
         assertEquals 1, metadataService.getCacheSize()
 
-        metadataService.clearMetadata(super.reposilite.getRepos().getRepo('main-releases').getFile(path))
+        metadataService.clearMetadata(super.reposilite.getRepos().getRepo('main').getFile(View.RELEASES, path))
         assertEquals 0, metadataService.getCacheSize()
     }
 
@@ -91,9 +92,8 @@ final class MetadataServiceTest extends ReposiliteTestSpecification {
 
     private String generate(String path) {
         def manager = super.reposilite.repos
-        def releases = manager.getRepo('main-releases')
-        def snapshots = manager.getRepo('main-snapshots')
-        def bytes = metadata().mergeMetadata(path, path, [releases, snapshots])
+        def repo = manager.getRepo('main')
+        def bytes = metadata().mergeMetadata(path, path, View.ALL, [repo])
         return bytes == null ? null : new String(bytes)
     }
 

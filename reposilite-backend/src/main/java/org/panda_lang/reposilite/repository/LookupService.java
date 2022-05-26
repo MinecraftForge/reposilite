@@ -19,11 +19,11 @@ package org.panda_lang.reposilite.repository;
 import org.apache.commons.io.FileUtils;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteContext.View;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
+import org.panda_lang.reposilite.repository.IRepository.View;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
@@ -63,15 +63,15 @@ final class LookupService {
         String[] parts = filepath.split("/");
         boolean isMeta = "maven-metadata.xml".equals(parts[parts.length - 1]);
 
-        if (context.view() == View.EXPLICIT || context.repos().size() == 1) {
-            IRepository repo = context.repos().isEmpty() ? null : context.repos().get(0);
+        if (context.repos().size() == 1) {
+            IRepository repo = context.repos().get(0);
             if (repo == null)
                 return ResponseUtils.error(SC_NOT_FOUND, "Can not find repo at: " + context.uri());
 
             if (!repo.canContain(context.filepath()))
                 return ResponseUtils.error(SC_NOT_FOUND, "Impossible artifact");
 
-            return findFile(context, parts, isMeta, true, null, context.repos(), 0, repo);
+            return findFile(context, parts, isMeta, context.view(), null, context.repos(), 0, repo);
         }
 
         List<IRepository> filtered = null;
@@ -84,46 +84,53 @@ final class LookupService {
             filtered.add(repo);
         }
 
-        if (filtered.isEmpty())
+        if (filtered == null)
             return ResponseUtils.error(SC_NOT_FOUND, "Can not find repo at: " + context.uri());
 
         // TODO: File hashes
         if (filtered.size() > 1 && isMeta) {
-            byte[] meta = metadataService.mergeMetadata(context.sanitized(), context.filepath(), filtered);
+            byte[] meta = metadataService.mergeMetadata(context.sanitized(), context.filepath(), context.view(), filtered);
             if (meta != null)
                 return Result.ok(new LookupResponse("text/xml", meta));
         }
 
-        return findFile(context, parts, isMeta, false, filtered.size() > 1 ? new HashSet<>() : null, filtered, 0, null);
+        return findFile(context, parts, isMeta, context.view(), filtered.size() > 1 ? new HashSet<>() : null, filtered, 0, null);
     }
 
-    private Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context, String[] parts, boolean isMeta, boolean isExplicit, Set<String> visited, List<IRepository> repos, int index, IRepository repo) {
+    private Result<LookupResponse, ErrorDto> findFile(ReposiliteContext context, String[] parts, boolean isMeta, View view, Set<String> visited, List<IRepository> repos, int index, IRepository repo) {
         if (repo == null)
             repo = repos.get(index);
 
         if (repo.isHidden()) {
             Result<Session, String> auth = context.session('/' + repo.getName() + '/' + context.filepath());
             if (auth.isErr() || !auth.get().hasAnyPermission(Permission.READ, Permission.WRITE, Permission.MANAGER)) {
-                if (!isExplicit)
+                if (context.repos().size() != 1)
                     return ResponseUtils.error(SC_NOT_FOUND, "File not found");
                 return ResponseUtils.error(SC_UNAUTHORIZED, "Unauthorized request");
             }
         }
 
-        File file = repo.getFile(context.filepath());
+        File file = null;
+        if (view == View.ALL) {
+            file = repo.getFile(View.RELEASES, context.filepath());
+            if (!file.exists())
+                file = repo.getFile(View.SNAPSHOTS, context.filepath());
+        } else {
+            file = repo.getFile(view, context.filepath());
+        }
 
         // TODO: Hash file extensions
         if (!file.exists()) {
             if (isMeta) {
                 if (parts.length == 1) // Must at least have a group in order to potentially exist
                     return ResponseUtils.error(SC_NOT_FOUND, "Missing group identifier");
-                return findProxy(context, parts, isMeta, isExplicit, visited, repos, index, repo);
+                return findProxy(context, parts, isMeta, view, visited, repos, index, repo);
             }
 
             // Must at least have 4 segments: group/artifact/version/file
             if (parts.length < 4)
                 return ResponseUtils.error(SC_NOT_FOUND, "Invalid artifact path");
-            return findProxy(context, parts, isMeta, isExplicit, visited, repos, index, repo);
+            return findProxy(context, parts, isMeta, view, visited, repos, index, repo);
         }
 
         if (file.isDirectory())
@@ -131,19 +138,21 @@ final class LookupService {
 
         FileDetailsDto fileDetails = FileDetailsDto.of(file);
 
-        if (!context.method().equals("HEAD"))
-            context.result(outputStream -> FileUtils.copyFile(file, outputStream));
+        if (!context.method().equals("HEAD")) { //TODO: Cache in memory?
+            final File f = file;
+            context.result(outputStream -> FileUtils.copyFile(f, outputStream));
+        }
 
         Reposilite.getLogger().debug("RESOLVED " + file.getPath() + "; mime: " + fileDetails.getContentType() + "; size: " + file.length());
         return Result.ok(new LookupResponse(fileDetails));
     }
 
-    private Result<LookupResponse, ErrorDto> findProxy(ReposiliteContext context, String[] parts, boolean isMeta, boolean isExplicit, Set<String> visited, List<IRepository> repos, int index, IRepository repo) {
+    private Result<LookupResponse, ErrorDto> findProxy(ReposiliteContext context, String[] parts, boolean isMeta, View view, Set<String> visited, List<IRepository> repos, int index, IRepository repo) {
         if (repo.getDelegate() != null) {
             IRepository delegate = this.repos.getRepo(repo.getDelegate());
             if (delegate != null) {
                 if  (visited == null || visited.add(delegate.getName()))
-                    return findFile(context, parts, isMeta, isExplicit, visited, repos, index, delegate);
+                    return findFile(context, parts, isMeta, view, visited, repos, index, delegate);
             }
         }
 
@@ -152,7 +161,7 @@ final class LookupService {
                 while (index < repos.size() - 1) {
                     IRepository next = repos.get(++index);
                     if (visited.add(next.getName()))
-                        return findFile(context, parts, isMeta, isExplicit, visited, repos, index, next);
+                        return findFile(context, parts, isMeta, view, visited, repos, index, next);
                 }
             }
             return ResponseUtils.error(SC_NOT_FOUND, "File not found");

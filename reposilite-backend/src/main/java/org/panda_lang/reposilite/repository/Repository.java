@@ -32,6 +32,7 @@ import org.panda_lang.reposilite.utils.FilesUtils;
 final class Repository implements IRepository {
     private final String name;
     private final File root;
+    private final File rootReleases, rootSnapshots;
     private final boolean hidden;
     private final boolean readOnly;
     private final boolean browseable;
@@ -43,6 +44,8 @@ final class Repository implements IRepository {
     private Repository(String name, File root, List<String> prefixes, boolean hidden, boolean readOnly, boolean browseable, DiskQuota quota, List<String> proxies, String delegate) {
         this.name = name;
         this.root = root;
+        this.rootReleases = new File(this.root, "releases");
+        this.rootSnapshots = new File(this.root, "snapshots");
         this.prefixes = prefixes == null || prefixes.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(prefixes);
         this.hidden = hidden;
         this.readOnly = readOnly;
@@ -57,14 +60,16 @@ final class Repository implements IRepository {
         if (this.root.mkdirs()) {
             Reposilite.getLogger().info("+ Repository '" + getName() + "' has been created");
         }
+        this.rootReleases.mkdirs();
+        this.rootSnapshots.mkdirs();
         // Calculate how much we've used.
         // TODO: Move to a thread as this can take time and we don't want to stall the server while iterating
         this.quota.allocate(FileUtils.sizeOfDirectory(this.root));
     }
 
     @Override
-    public boolean contains(String path) {
-        File targetFile = getFile(path);
+    public boolean contains(View view, String path) {
+        File targetFile = getFile(view, path);
 
         // TODO: Checks if length < 3 because it was checking for artifact info group:name:version
         // But that was dirty and dumb, we can do better
@@ -74,11 +79,23 @@ final class Repository implements IRepository {
         return true;
     }
 
+    private File getRoot(View view, String path) {
+        switch (view) {
+            case ALL:
+                return path != null && !path.contains("-SNAPSHOT") ? this.rootReleases : this.rootSnapshots;
+            case SNAPSHOTS:
+                return this.rootSnapshots;
+            case RELEASES:
+            default:
+                return this.rootReleases;
+        }
+    }
+
     @Override
-    public File getFile(String... path) {
-        if (path.length == 1)
-            return new File(this.root, path[0]);
-        return new File(this.root, Arrays.stream(path).collect(Collectors.joining(File.separator)));
+    public File getFile(View view, String... paths) {
+        if (paths.length == 0) return getRoot(view, null);
+        String path = paths.length == 1 ? paths[0] : Arrays.stream(paths).collect(Collectors.joining(File.separator));
+        return new File(getRoot(view, path), path);
     }
 
     /*
@@ -152,9 +169,12 @@ final class Repository implements IRepository {
             }
         }
 
-        File file = getFile(path);
-        return file.exists() && file.isDirectory();
+        File file = getFile(View.RELEASES, path);
+        if (file.exists() && file.isDirectory())
+            return true;
 
+        file = getFile(View.SNAPSHOTS, path);
+        return file.exists() && file.isDirectory();
     }
 
     @Override

@@ -19,7 +19,9 @@ package org.panda_lang.reposilite.auth
 import groovy.transform.CompileStatic
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.io.TempDir
 import org.panda_lang.reposilite.config.Configuration
 import org.panda_lang.reposilite.error.FailureService
@@ -30,6 +32,7 @@ import java.util.concurrent.Executors
 import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class SessionTest {
 
     @TempDir
@@ -44,8 +47,8 @@ class SessionTest {
             .quota('0')
             .executor(Executors.newSingleThreadExecutor())
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo("main-releases", {})
-            .repo("main-snapshots", {})
+            .repo("main", {})
+            .repo("second", {})
             .build();
     }
 
@@ -83,13 +86,12 @@ class SessionTest {
         assertTrue signin.isOk()
         def wildcardSession = signin.get()
 
-        assertTrue wildcardSession.hasPermissionTo('/main-releases/b/c')
-        assertTrue wildcardSession.hasPermissionTo('/main-releases/b/c/d')
-        assertTrue wildcardSession.hasPermissionTo('/main-snapshots/b/c')
+        assertTrue wildcardSession.hasPermissionTo('/main/b/c')
+        assertTrue wildcardSession.hasPermissionTo('/main/b/c/d')
+        assertTrue wildcardSession.hasPermissionTo('/second/b/c/d') // Existing
 
-        assertFalse wildcardSession.hasPermissionTo('/main-releases/b')
-        assertFalse wildcardSession.hasPermissionTo('/main-snapshots/b')
-        assertFalse wildcardSession.hasPermissionTo('/custom/b/c')
+        assertFalse wildcardSession.hasPermissionTo('/main/b')
+        assertFalse wildcardSession.hasPermissionTo('/custom/b/c') // Doesn't exist
     }
 
     @Test
@@ -112,11 +114,11 @@ class SessionTest {
 
     @Test
     void 'should contain only authorized repositories' () {
-        def token = AUTH_MANAGER.createToken('/main-releases', 'alias', 'rw', 'token')
+        def token = AUTH_MANAGER.createToken('/main', 'alias', 'rw', 'token')
         def signin = AUTH_MANAGER.getSession('alias:token')
         assertTrue signin.isOk()
         def session = signin.get()
-        assertEquals Collections.singletonList(REPOSITORY_MANAGER.getRepo('main-releases')), session.getRepositories()
+        assertEquals Collections.singletonList(REPOSITORY_MANAGER.getRepo('main')), session.getRepositories()
     }
 
     @Test

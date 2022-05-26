@@ -58,13 +58,13 @@ class ConfigurationLoaderTest {
             'port':         '8080',         // Integer type
             'debugEnabled': 'true',         // Boolean type
             'repositories': ' ',            // Skip empty
-            'repositories.main-releases.proxies': 'http://a.com,b.com',  // List<String> type
+            'repositories.main.proxies': 'http://a.com,b.com',  // List<String> type
         ])
 
         assertEquals "localhost", conf.hostname
         assertEquals 8080, conf.port
         assertTrue conf.debugEnabled
-        assertEquals Arrays.asList("http://a.com/", "b.com/"), conf.repositories.get('main-releases').proxies
+        assertEquals Arrays.asList("http://a.com/", "b.com/"), conf.repositories.get('main').proxies
         assertFalse conf.repositories.isEmpty()
     }
 
@@ -100,14 +100,14 @@ class ConfigurationLoaderTest {
 
     @Test
     void 'should sanitize proxies' () {
-        def config = cfg(['repositories.main-snapshots.proxies': 'https://without.slash,https://with.slash/'])
-        assertEquals Arrays.asList('https://without.slash/', 'https://with.slash/'), config.repositories.get('main-snapshots').proxies
+        def config = cfg(['repositories.main.proxies': 'https://without.slash,https://with.slash/'])
+        assertEquals Arrays.asList('https://without.slash/', 'https://with.slash/'), config.repositories.get('main').proxies
     }
 
     @Test
     void 'should sanitize prefixes' () {
-        def config = cfg(['repositories.main-snapshots.prefixes': 'without.slash,with.slash/,/with.extra.slash/'])
-        assertEquals Arrays.asList('without.slash/', 'with.slash/', 'with.extra.slash/'), config.repositories.get('main-snapshots').prefixes
+        def config = cfg(['repositories.main.prefixes': 'without.slash,with.slash/,/with.extra.slash/'])
+        assertEquals Arrays.asList('without.slash/', 'with.slash/', 'with.extra.slash/'), config.repositories.get('main').prefixes
     }
 
     @Test
@@ -120,8 +120,8 @@ class ConfigurationLoaderTest {
     void 'should error with proxy and delegate' () {
         assertThrows IllegalStateException.class, {
             cfg([
-                'repositories.main-releases.delegate': 'main-snapshots',
-                'repositories.main-releases.proxies':  'localhost'
+                'repositories.main.delegate': 'main',
+                'repositories.main.proxies':  'localhost'
             ])
         }
     }
@@ -129,7 +129,7 @@ class ConfigurationLoaderTest {
     @Test
     void 'should error with invalid delegate' () {
         assertThrows IllegalStateException.class, {
-            cfg(['repositories.main-releases.delegate': 'unknown repo'])
+            cfg(['repositories.main.delegate': 'unknown repo'])
         }
     }
 }

@@ -20,8 +20,11 @@ import groovy.transform.CompileStatic
 
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.TestMethodOrder
 import org.junit.jupiter.api.io.TempDir
+import org.panda_lang.reposilite.repository.IRepository.View
 import org.panda_lang.utilities.commons.FileUtils
 import java.nio.channels.FileChannel
 import java.nio.file.OpenOption
@@ -36,6 +39,7 @@ import java.util.concurrent.TimeUnit
 import static org.junit.jupiter.api.Assertions.*
 
 @CompileStatic
+@TestMethodOrder(MethodOrderer.MethodName.class)
 class RepositoryStorageTest {
     @TempDir
     protected static File WORKING_DIRECTORY
@@ -48,19 +52,18 @@ class RepositoryStorageTest {
             .quota('0')
             .executor(new ThreadPoolExecutor(0, Integer.MAX_VALUE, 1, TimeUnit.SECONDS, new SynchronousQueue<>()))
             .scheduled(Executors.newSingleThreadScheduledExecutor())
-            .repo('main-releases', {})
-            .repo('main-snapshots', {})
+            .repo('main', {})
             .build()
     }
 
     @Test
     void 'should add size of written file to the disk quota'() {
-        def releases = REPOSITORY_MANAGER.getRepo('main-releases')
+        def releases = REPOSITORY_MANAGER.getRepo('main')
         def initialUsage = REPOSITORY_MANAGER.quota.usage
         def string = 'test'
         def expectedUsage = initialUsage + string.bytes.length
 
-        REPOSITORY_MANAGER.@storage.storeFile(stream(string), releases, 'file')
+        REPOSITORY_MANAGER.@storage.storeFile(stream(string), releases, 'file', View.RELEASES)
 
         assertEquals expectedUsage, REPOSITORY_MANAGER.quota.usage
     }

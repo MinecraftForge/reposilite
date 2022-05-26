@@ -19,11 +19,11 @@ package org.panda_lang.reposilite.repository;
 import org.apache.http.HttpStatus;
 import org.panda_lang.reposilite.Reposilite;
 import org.panda_lang.reposilite.ReposiliteContext;
-import org.panda_lang.reposilite.ReposiliteContext.View;
 import org.panda_lang.reposilite.auth.Permission;
 import org.panda_lang.reposilite.auth.Session;
 import org.panda_lang.reposilite.error.ErrorDto;
 import org.panda_lang.reposilite.error.ResponseUtils;
+import org.panda_lang.reposilite.repository.IRepository.View;
 import org.panda_lang.utilities.commons.function.Result;
 
 import java.io.File;
@@ -48,10 +48,10 @@ final class DeployService {
 
         IRepository repo = null;
         if (!context.repos().isEmpty()) {
-            if (context.view() == View.EXPLICIT) {
-                repo = context.repos().get(0);
-            } else if (context.view() != View.RELEASES && context.view() != View.SNAPSHOTS) {
+            if (context.view() != View.RELEASES && context.view() != View.SNAPSHOTS) {
                 return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Deploying to unknown endpoint. Must be a explicit repo, '/releases', or '/snapshots'");
+            } else if (context.repos().size() == 1) {
+                repo = context.repos().get(0);
             } else {
                 for (IRepository r : context.repos()) {
                     if (r.canContain(uri)) {
@@ -61,6 +61,7 @@ final class DeployService {
                 }
             }
         }
+
         if (repo == null) {
             return ResponseUtils.error(HttpStatus.SC_NOT_FOUND, "Can not find repo at: " + context.uri());
         }
@@ -89,7 +90,13 @@ final class DeployService {
             return ResponseUtils.error(HttpStatus.SC_INSUFFICIENT_STORAGE, "Out of disk space");
         }
 
-        File file = repo.getFile(context.filepath());
+        File file = repo.getFile(context.view(), context.filepath());
+
+        boolean isMeta = file.getName().contains("maven-metadata.xml");
+        if (!isMeta && context.view() == View.SNAPSHOTS && !context.filepath().contains("-SNAPSHOT")) {
+            return ResponseUtils.error(HttpStatus.SC_METHOD_NOT_ALLOWED, "Cannot deploy non-SNAPSHOT artifact to snapshot repo");
+        }
+
         FileDetailsDto fileDetails = FileDetailsDto.of(file);
 
         File metadataFile = new File(file.getParentFile(), "maven-metadata.xml");
@@ -106,6 +113,7 @@ final class DeployService {
         CompletableFuture<Result<FileDetailsDto, ErrorDto>> task = ((RepositoryManager)repos).storeFile(
             uri,
             repo,
+            context.view(),
             context.filepath(),
             context::input,
             () -> fileDetails,

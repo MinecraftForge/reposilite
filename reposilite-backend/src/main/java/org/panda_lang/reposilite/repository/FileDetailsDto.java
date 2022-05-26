@@ -87,6 +87,9 @@ final class FileDetailsDto implements Comparable<FileDetailsDto> {
     }
 
     public static FileDetailsDto of(File file) {
+        return of(file, file.getName());
+    }
+    public static FileDetailsDto of(File file, String name) {
         String date = StringUtils.EMPTY;
         String contentType = FilesUtils.getMimeType(file.getAbsolutePath(), "application/octet-stream");
 
@@ -99,7 +102,7 @@ final class FileDetailsDto implements Comparable<FileDetailsDto> {
 
         return new FileDetailsDto(
                 file.isDirectory() ? DIRECTORY : FILE,
-                file.getName(),
+                name,
                 date,
                 contentType,
                 file.isDirectory() ? -1 : file.length());

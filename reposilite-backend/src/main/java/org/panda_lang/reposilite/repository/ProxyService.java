@@ -143,10 +143,11 @@ final class ProxyService {
         CompletableFuture<Result<LookupResponse, ErrorDto>> future = ((RepositoryManager)repos).storeFile(
             uri,
             repo,
+            context.view(),
             context.filepath(),
             remoteResponse::getContent,
             () -> {
-                File file = repo.getFile(context.filepath());
+                File file = repo.getFile(context.view(), context.filepath());
                 Reposilite.getLogger().info("Stored proxied " + context.filepath() + " in " + repo + " from " + remoteResponse.getRequest().getUrl());
                 context.result(outputStream -> FileUtils.copyFile(file, outputStream));
                 return new LookupResponse(FileDetailsDto.of(file));
