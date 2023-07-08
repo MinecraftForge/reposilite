@@ -89,7 +89,7 @@ public final class Configuration {
     @Description({
     "",
     "# Repositories, in the order in which they will be searched.",
-    "# Repository names must mete the following criteria:",
+    "# Repository names must meet the following criteria:",
     "#   No '-': This denotes a suffix for filtering.",
     "#   Lowercase: To prevent ambiguity in requests.",
     "#   Neither `releases` or `snapshots`: Reserved for multi-repo views.",

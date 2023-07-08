@@ -1,4 +1,12 @@
-FROM openjdk:15-alpine
+FROM eclipse-temurin:17-jdk as build-java
+COPY reposilite-backend /root/project
+COPY gradlew /root/project/gradlew
+COPY gradle /root/project/gradle
+WORKDIR /root/project
+RUN chmod +x ./gradlew
+RUN ./gradlew shadowJar --no-daemon
+
+FROM openjdk:17-alpine
 
 # Build-time metadata stage
 ARG BUILD_DATE
@@ -19,5 +27,5 @@ RUN apk add --no-cache mailcap
 WORKDIR /app
 RUN mkdir -p /app/data
 VOLUME /app/data
-COPY ./reposilite-backend/build/libs/reposilite*-all.jar reposilite.jar
+COPY --from=build-java /root/project/build/libs/reposilite*-all.jar reposilite.jar
 ENTRYPOINT exec java $JAVA_OPTS -jar reposilite.jar -wd=/app/data $REPOSILITE_OPTS
